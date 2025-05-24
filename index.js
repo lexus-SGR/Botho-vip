@@ -18,6 +18,11 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
+// Homepage route
+app.get('/', (req, res) => {
+  res.send('Welcome to Ben Whittaker WhatsApp Bot API. Use POST /pair with your phone number.');
+});
+
 // Pair route
 app.post('/pair', async (req, res) => {
   const phone = req.body.phone;
@@ -45,17 +50,18 @@ app.post('/pair', async (req, res) => {
     const pairingCode = await sock.requestPairingCode(`${phone}@s.whatsapp.net`);
     res.json({ pairing_code: pairingCode });
 
-    // Tuma pairing notification message
     const jid = `${phone}@s.whatsapp.net`;
+
+    // Send pairing instructions
     await sock.sendMessage(jid, {
       text:
 `✅ Your 8-digit pairing code is ready.
 
 Now open WhatsApp Messenger:
-Go to ➤ Linked Devices > Link a Device
-Then enter this code: *${pairingCode}*
+➤ Go to "Linked Devices" > Tap "Link a Device"
+➤ Enter this code: *${pairingCode}*
 
-⌛ You have 10 minutes before it expires.`
+⌛ Code will expire in 10 minutes.`
     });
 
     sock.ev.on('connection.update', async (update) => {
@@ -72,15 +78,15 @@ Then enter this code: *${pairingCode}*
         const buffer = fs.readFileSync(zipPath);
         const mimeType = mime.lookup(zipPath);
 
-        // Tuma session file
+        // Send session file
         await sock.sendMessage(jid, {
           document: buffer,
           mimetype: mimeType,
           fileName: `${phone}-session.zip`,
-          caption: `✅ This is your session file for Render/Heroku deployment.\n\nKeep it safe.`
+          caption: `✅ This is your session file for Render/Heroku deployment.\nKeep this file safe.`
         });
 
-        // Optional: Tuma mp3 ya ushahidi
+        // Optional: Send spd.mp3 audio message
         const audioPath = path.join(__dirname, 'spd.mp3');
         if (fs.existsSync(audioPath)) {
           await sock.sendMessage(jid, {
@@ -98,7 +104,6 @@ Then enter this code: *${pairingCode}*
     });
 
     sock.ev.on('creds.update', saveCreds);
-
   } catch (error) {
     console.error('Failed to generate pairing code:', error);
     res.status(500).json({ error: 'Could not generate pairing code' });

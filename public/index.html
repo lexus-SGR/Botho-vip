@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Ben Whittaker Tech - WhatsApp Bot Pairing</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -48,9 +49,15 @@
       border-radius: 8px;
       box-shadow: 0 0 5px rgba(0,0,0,0.1);
     }
+    .logo {
+      width: 120px;
+      height: auto;
+      margin-bottom: 1rem;
+    }
   </style>
 </head>
 <body>
+  <img src="logo.png" alt="Ben Whittaker Logo" class="logo" />
   <h2>Ben Whittaker WhatsApp Bot Pairing</h2>
   <form onsubmit="submitPhone(event)">
     <input type="text" id="phone" placeholder="Enter your phone (e.g. 2557xxxxxxx)" required />

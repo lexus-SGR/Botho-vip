@@ -85,7 +85,7 @@
       resultDiv.textContent = "Loading pairing code...";
 
       try {
-        const res = await fetch('/pair', {
+        const res = await fetch('https://botho-vip.onrender.com/pair', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone })

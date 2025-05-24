@@ -7,7 +7,6 @@ const {
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore
 } = require('@whiskeysockets/baileys');
-const { Boom } = require('@hapi/boom');
 const fs = require('fs');
 const path = require('path');
 
@@ -18,6 +17,7 @@ const OWNER_JID = `${process.env.OWNER}@s.whatsapp.net`;
 app.use(express.json());
 app.use(express.static('public'));
 
+// Load commands (optional)
 const commands = new Map();
 const commandsPath = path.join(__dirname, 'commands');
 
@@ -34,6 +34,7 @@ if (fs.existsSync(commandsPath)) {
   console.log('Created commands folder.');
 }
 
+// Pairing route
 app.post('/pair', async (req, res) => {
   const phone = req.body.phone;
   if (!phone || !/^\d{10,15}$/.test(phone)) {
@@ -54,27 +55,18 @@ app.post('/pair', async (req, res) => {
     browser: ['Ben Whittaker Bot', 'Safari', '1.0.0']
   });
 
-  sock.ev.once('connection.update', async (update) => {
-    const { pairingCode, connection, lastDisconnect } = update;
-
-    if (pairingCode) {
-      return res.json({ pairing_code: pairingCode });
-    }
-
-    if (connection === 'open') {
-      console.log('Connected to WhatsApp:', phone);
-      // You can send a message to the owner or save session here if needed
-    }
-
-    if (connection === 'close') {
-      const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-      console.log('Connection closed:', reason);
-    }
-  });
+  try {
+    const pairingCode = await sock.requestPairingCode(`${phone}@s.whatsapp.net`);
+    res.json({ pairing_code: pairingCode });
+  } catch (error) {
+    console.error('Failed to generate pairing code:', error);
+    res.status(500).json({ error: 'Failed to generate pairing code' });
+  }
 
   sock.ev.on('creds.update', saveCreds);
 });
 
+// Start server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });

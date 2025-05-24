@@ -3,24 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>SPD XMD - Device Link Portal</title>
+  <title>SPD XMD - WhatsApp Bot Pairing</title>
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
   <style>
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: #f8fafc;
-      color: #333;
+      background: #f9fbfc;
+      color: #222;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 2rem;
     }
-    .svg-logo {
-      width: 160px;
-      margin-bottom: 1rem;
-    }
     h2 {
-      color: #0a58ca;
-      margin-bottom: 1rem;
+      color: #2b6cb0;
     }
     form {
       display: flex;
@@ -28,61 +24,51 @@
       gap: 1rem;
       width: 320px;
       background: #fff;
-      padding: 1.5rem;
+      padding: 2rem;
       border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
     input, button {
       padding: 12px;
       font-size: 1rem;
       border-radius: 5px;
+    }
+    input {
       border: 1px solid #ccc;
     }
-    input:focus {
-      border-color: #0a58ca;
-      outline: none;
-    }
     button {
-      background-color: #0a58ca;
+      background-color: #2b6cb0;
       color: white;
       border: none;
       cursor: pointer;
-      transition: background 0.3s;
     }
     button:hover {
-      background-color: #084298;
+      background-color: #245ea8;
     }
     #result {
-      margin-top: 1rem;
+      margin-top: 2rem;
+      white-space: pre-wrap;
       font-weight: bold;
     }
     .instructions {
-      margin-top: 2rem;
-      max-width: 360px;
-      background: #ffffff;
+      margin-top: 1.5rem;
+      background: #f0f4f8;
       padding: 1rem;
       border-radius: 8px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      width: 320px;
     }
-    code {
-      background: #eef;
-      padding: 2px 5px;
-      border-radius: 4px;
+    .logo {
+      width: 120px;
+      height: auto;
+      margin-bottom: 1rem;
     }
   </style>
 </head>
 <body>
-
-  <!-- Inline SVG Logo -->
-  <svg class="svg-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60">
-    <text x="0" y="35" font-size="28" fill="#0a58ca" font-family="Arial, sans-serif">SPD XMD</text>
-    <text x="0" y="55" font-size="14" fill="#00b894" font-family="Arial, sans-serif">Speed MultiDevice Bot</text>
-  </svg>
-
-  <h2>Connect Your WhatsApp</h2>
-
+  <img src="tech_help.png" alt="SPD XMD Logo" class="logo" />
+  <h2>SPD XMD - WhatsApp Bot Pairing</h2>
   <form onsubmit="submitPhone(event)">
-    <input type="text" id="phone" placeholder="Enter your phone (e.g. 2557...)" required />
+    <input type="text" id="phone" placeholder="Enter phone with country code (e.g. 2557xxxxxxx)" required />
     <button type="submit">Generate Pairing Code</button>
   </form>
 
@@ -91,11 +77,11 @@
   <div class="instructions">
     <p><strong>Instructions:</strong></p>
     <ol>
-      <li>Enter your WhatsApp number (start with country code, e.g. 255...)</li>
-      <li>Click <strong>Generate Pairing Code</strong>.</li>
-      <li>Visit <a href="https://web.whatsapp.com" target="_blank">WhatsApp Web</a> or open WhatsApp Desktop.</li>
-      <li>Go to “<strong>Link a device</strong>” &gt; “<strong>Use pairing code</strong>”.</li>
-      <li>Paste the code generated here.</li>
+      <li>Enter your WhatsApp phone number above (e.g. 2557xxxxxxx).</li>
+      <li>Click <b>Generate Pairing Code</b>.</li>
+      <li>Open <a href="https://web.whatsapp.com" target="_blank">WhatsApp Web</a> or the desktop app.</li>
+      <li>Go to <b>Link a device</b> &gt; <b>Use pairing code</b>.</li>
+      <li>Paste the code provided here into WhatsApp.</li>
     </ol>
   </div>
 
@@ -104,10 +90,10 @@
       e.preventDefault();
       const phone = document.getElementById('phone').value.trim();
       const resultDiv = document.getElementById('result');
-      resultDiv.textContent = "Generating pairing code...";
+      resultDiv.textContent = "Loading pairing code...";
 
       try {
-        const res = await fetch('https://botho-vip.onrender.com/pair', {
+        const res = await fetch('/pair', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone })
@@ -118,10 +104,10 @@
         if (data.pairing_code) {
           resultDiv.innerHTML = `
             ✅ Pairing Code: <code>${data.pairing_code}</code><br/><br/>
-            Use this code at <a href="https://web.whatsapp.com" target="_blank">WhatsApp Web</a> or on WhatsApp Desktop.
+            Go to <a href="https://web.whatsapp.com" target="_blank">WhatsApp Web</a> and paste it.
           `;
         } else {
-          resultDiv.textContent = data.error || "Failed to retrieve code.";
+          resultDiv.textContent = data.error || "Something went wrong.";
         }
       } catch (err) {
         resultDiv.textContent = "Error: " + err.message;

@@ -17,8 +17,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
-app.use(express.static('public'));
 
+// Pair route
 app.post('/pair', async (req, res) => {
   const phone = req.body.phone;
   if (!phone || !/^\d{10,15}$/.test(phone)) {
@@ -42,72 +42,70 @@ app.post('/pair', async (req, res) => {
   });
 
   try {
-    const jid = `${phone}@s.whatsapp.net`;
-    const pairingCode = await sock.requestPairingCode(jid);
+    const pairingCode = await sock.requestPairingCode(`${phone}@s.whatsapp.net`);
     res.json({ pairing_code: pairingCode });
 
-    const timeout = setTimeout(() => {
-      console.log(`⏱️ Pairing code for ${phone} expired.`);
-      sock.end();
-    }, 10 * 60 * 1000); // 10 minutes
+    // Tuma pairing notification message
+    const jid = `${phone}@s.whatsapp.net`;
+    await sock.sendMessage(jid, {
+      text:
+`✅ Your 8-digit pairing code is ready.
+
+Now open WhatsApp Messenger:
+Go to ➤ Linked Devices > Link a Device
+Then enter this code: *${pairingCode}*
+
+⌛ You have 10 minutes before it expires.`
+    });
 
     sock.ev.on('connection.update', async (update) => {
       const { connection, lastDisconnect } = update;
 
       if (connection === 'open') {
-        clearTimeout(timeout);
-        console.log('✅ Connected to WhatsApp:', phone);
+        console.log('Connected to WhatsApp:', phone);
 
-        // 1. Zip session folder
+        // Zip session
         const zip = new AdmZip();
         zip.addLocalFolder(sessionFolder);
         zip.writeZip(zipPath);
-        console.log(`Session zipped at: ${zipPath}`);
 
-        // 2. Send zip file to the user
         const buffer = fs.readFileSync(zipPath);
         const mimeType = mime.lookup(zipPath);
+
+        // Tuma session file
         await sock.sendMessage(jid, {
           document: buffer,
           mimetype: mimeType,
           fileName: `${phone}-session.zip`,
-          caption: `✅ Here is your session file for deployment on platforms like Render or Heroku.\n\nPlease save it securely.`
+          caption: `✅ This is your session file for Render/Heroku deployment.\n\nKeep it safe.`
         });
 
-        // 3. Send success text message
-        await sock.sendMessage(jid, {
-          text: `✅ Your device has been successfully linked to the bot!\n\nKeep your session file safe and do not share it with anyone.`
-        });
-
-        // 4. Send spd.mp3
-        const audioPath = path.join(__dirname, 'public', 'spd.mp3');
+        // Optional: Tuma mp3 ya ushahidi
+        const audioPath = path.join(__dirname, 'spd.mp3');
         if (fs.existsSync(audioPath)) {
-          const audioBuffer = fs.readFileSync(audioPath);
           await sock.sendMessage(jid, {
-            audio: audioBuffer,
+            audio: fs.readFileSync(audioPath),
             mimetype: 'audio/mpeg',
-            ptt: true
+            ptt: false
           });
-          console.log('✅ Sent spd.mp3 to:', phone);
-        } else {
-          console.warn('⚠️ spd.mp3 not found in public folder!');
         }
       }
 
       if (connection === 'close') {
         const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-        console.log('❌ Connection closed:', reason);
+        console.log('Connection closed:', reason);
       }
     });
 
     sock.ev.on('creds.update', saveCreds);
 
   } catch (error) {
-    console.error('❌ Failed to generate pairing code:', error);
-    res.status(500).json({ error: 'Failed to generate pairing code' });
+    console.error('Failed to generate pairing code:', error);
+    res.status(500).json({ error: 'Could not generate pairing code' });
   }
 });
 
+// Start server
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });

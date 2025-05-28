@@ -73,7 +73,7 @@ if (command === "menu") {
 
 });
 
-// Load all commands from ./commands const commandFiles = fs.readdirSync("./commands").filter(file => file.endsWith(".js")); for (const file of commandFiles) { require(./commands/${file})(sock); } }
+commands const commandFiles = fs.readdirSync("./commands").filter(file => file.endsWith(".js")); for (const file of commandFiles) { require(./commands/${file})(sock); } }
 
 startBot();
 

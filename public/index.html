@@ -2,44 +2,82 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Botho VIP - Pair Code</title>
+  <title>Botho VIP - Pair Code & Session ID</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="container">
-    <h1>🤖 Pair Code Generator</h1>
-    <input type="text" id="phone" placeholder="Enter WhatsApp Number" />
-    <input type="text" id="code" placeholder="8-digit Pair Code" />
-    <button onclick="generate()">Generate Pair Code</button>
-    <button onclick="validate()">Validate Code</button>
+    <h1>🤖 Pair Code Generator & Session ID</h1>
+
+    <input type="text" id="phone" placeholder="📞 Enter WhatsApp Number" required />
+    <button onclick="generate()">🔗 Generate Pair Code</button>
+
+    <hr />
+
+    <input type="text" id="code" placeholder="🔢 Enter 8-digit Pair Code" />
+    <button onclick="requestSessionId()">📲 Get Session ID</button>
+
     <p id="response"></p>
   </div>
 
   <script>
+    function generateCode() {
+      return Math.floor(10000000 + Math.random() * 90000000).toString();
+    }
+
     async function generate() {
-      const code = document.getElementById('code').value;
-      const phone = document.getElementById('phone').value;
+      const phone = document.getElementById('phone').value.trim();
+      const code = generateCode();
+
+      if (!phone.match(/^\d+$/)) {
+        return document.getElementById('response').innerText = "⚠️ Invalid phone number";
+      }
 
       const res = await fetch('/paircodes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, phone }),
       });
+
       const data = await res.json();
-      document.getElementById('response').innerText = JSON.stringify(data, null, 2);
+
+      document.getElementById('response').innerHTML = `
+        ✅ <strong>Code:</strong> <code>${code}</code><br>
+        📞 <strong>Phone:</strong> ${phone}<br>
+        📨 <strong>Server Response:</strong><br>
+        <pre>${JSON.stringify(data, null, 2)}</pre>
+      `;
     }
 
-    async function validate() {
-      const code = document.getElementById('code').value;
-      const phone = document.getElementById('phone').value;
+    async function requestSessionId() {
+      const code = document.getElementById('code').value.trim();
+      const phone = document.getElementById('phone').value.trim();
 
-      const res = await fetch('/validate', {
+      if (code.length !== 8) {
+        return document.getElementById('response').innerText = "⚠️ Pair code must be exactly 8 digits";
+      }
+      if (!phone.match(/^\d+$/)) {
+        return document.getElementById('response').innerText = "⚠️ Invalid phone number";
+      }
+
+      const res = await fetch('/get-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, phone }),
       });
+
       const data = await res.json();
-      document.getElementById('response').innerText = JSON.stringify(data, null, 2);
+
+      if (data.sessionId) {
+        document.getElementById('response').innerHTML = `
+          🔐 <strong>Session ID:</strong><br>
+          <code>${data.sessionId}</code>
+        `;
+      } else if (data.error) {
+        document.getElementById('response').innerText = `⚠️ Error: ${data.error}`;
+      } else {
+        document.getElementById('response').innerText = "⚠️ Unknown server response";
+      }
     }
   </script>
 </body>

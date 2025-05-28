@@ -1,79 +1,109 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
-app.use(express.static('public')); // serve frontend
+// Faili kuhifadhi paircodes na sessions
+const pairCodesFile = path.join(__dirname, 'paircodes.json');
+const sessionsFile = path.join(__dirname, 'sessions.json');
 
-const pairCodesPath = path.join(__dirname, 'paircodes.json');
+// Muda wa ku-expire kwa pair code (kwa millisekunde), hapa ni dakika 10
+const PAIR_CODE_EXPIRY = 10 * 60 * 1000;
 
-function readPairCodes() {
-  if (!fs.existsSync(pairCodesPath)) {
-    fs.writeFileSync(pairCodesPath, JSON.stringify({}));
+// Helper kusoma faili, kama haipo andika mpya
+function readJsonFile(filepath) {
+  if (!fs.existsSync(filepath)) {
+    fs.writeFileSync(filepath, JSON.stringify({}));
   }
-  return JSON.parse(fs.readFileSync(pairCodesPath));
+  return JSON.parse(fs.readFileSync(filepath, 'utf-8'));
 }
 
-function writePairCodes(data) {
-  fs.writeFileSync(pairCodesPath, JSON.stringify(data, null, 2));
+// Helper kuandika faili
+function writeJsonFile(filepath, data) {
+  fs.writeFileSync(filepath, JSON.stringify(data, null, 2));
 }
 
-app.get('/paircodes', (req, res) => {
-  const pairCodes = readPairCodes();
-  res.json(pairCodes);
-});
+app.use(express.json());
+app.use(express.static('public')); // Kama unatumia folder ya public kwa html,css
 
+// API kuongeza pair code
 app.post('/paircodes', (req, res) => {
   const { code, phone } = req.body;
 
   if (!code || code.length !== 8) {
-    return res.status(400).json({ error: 'Code must be 8 digits' });
+    return res.status(400).json({ error: 'Code must be exactly 8 digits' });
   }
   if (!phone || !phone.match(/^\d+$/)) {
     return res.status(400).json({ error: 'Invalid phone number' });
   }
 
-  const pairCodes = readPairCodes();
+  const pairCodes = readJsonFile(pairCodesFile);
 
   if (pairCodes[code]) {
     return res.status(400).json({ error: 'Pair code already exists' });
   }
 
-  pairCodes[code] = phone;
-  writePairCodes(pairCodes);
+  const now = Date.now();
 
-  res.json({ message: 'Pair code added successfully', pairCodes });
+  // Hifadhi pair code na phone na timestamp ya ku-create
+  pairCodes[code] = {
+    phone,
+    createdAt: now
+  };
+
+  writeJsonFile(pairCodesFile, pairCodes);
+
+  res.json({ message: 'Pair code created', code, phone });
 });
 
-app.post('/validate', (req, res) => {
+// API kupata session id kwa pair code na phone
+app.post('/get-session', (req, res) => {
   const { code, phone } = req.body;
 
   if (!code || code.length !== 8) {
-    return res.status(400).json({ error: 'Code must be 8 digits' });
+    return res.status(400).json({ error: 'Code must be exactly 8 digits' });
   }
-  if (!phone || !phone.match(/^\d{10,15}$/)) {
+  if (!phone || !phone.match(/^\d+$/)) {
     return res.status(400).json({ error: 'Invalid phone number' });
   }
 
-  const pairCodes = readPairCodes();
+  const pairCodes = readJsonFile(pairCodesFile);
 
-  if (!pairCodes[code]) {
+  const entry = pairCodes[code];
+
+  if (!entry) {
     return res.status(404).json({ error: 'Pair code not found' });
   }
 
-  if (pairCodes[code] !== phone) {
-    return res.status(403).json({ error: 'Phone number does not match the pair code' });
+  if (entry.phone !== phone) {
+    return res.status(403).json({ error: 'Phone number does not match pair code' });
   }
 
-  const sessionId = `SESSION-${Math.random().toString(36).substr(2, 10).toUpperCase()}`;
+  // Check expiry
+  const now = Date.now();
+  if (now - entry.createdAt > PAIR_CODE_EXPIRY) {
+    // Delete expired pair code
+    delete pairCodes[code];
+    writeJsonFile(pairCodesFile, pairCodes);
+    return res.status(410).json({ error: 'Pair code expired' });
+  }
 
-  console.log(`✅ Session ID for ${phone}: ${sessionId}`);
+  // Load sessions
+  const sessions = readJsonFile(sessionsFile);
 
-  return res.json({ sessionId });
+  // If sessionId for this phone exists, return it, else create new
+  if (!sessions[phone]) {
+    // Simulate sessionId generate - replace this with real logic your bot uses
+    sessions[phone] = `session-${phone}-${Math.random().toString(36).slice(2, 10)}`;
+
+    writeJsonFile(sessionsFile, sessions);
+  }
+
+  res.json({ sessionId: sessions[phone] });
 });
 
 app.listen(PORT, () => {
-  console.log(`✅ Pair Code Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

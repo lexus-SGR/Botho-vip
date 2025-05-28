@@ -7,10 +7,10 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// Path ya paircodes file
+// File ya kuhifadhi paircodes
 const pairCodesPath = path.join(__dirname, 'paircodes.json');
 
-// Helper kusoma paircodes
+// Kusoma paircodes
 function readPairCodes() {
   if (!fs.existsSync(pairCodesPath)) {
     fs.writeFileSync(pairCodesPath, JSON.stringify({}));
@@ -18,18 +18,23 @@ function readPairCodes() {
   return JSON.parse(fs.readFileSync(pairCodesPath));
 }
 
-// Helper kuandika paircodes
+// Kuandika paircodes
 function writePairCodes(data) {
   fs.writeFileSync(pairCodesPath, JSON.stringify(data, null, 2));
 }
 
-// API kuangalia pair codes zote
+// Root route
+app.get('/', (req, res) => {
+  res.send('✅ Botho VIP Pair Code Server is Online!');
+});
+
+// Orodha ya paircodes
 app.get('/paircodes', (req, res) => {
   const pairCodes = readPairCodes();
   res.json(pairCodes);
 });
 
-// API kuongeza pair code mpya
+// Ongeza paircode mpya
 app.post('/paircodes', (req, res) => {
   const { code, phone } = req.body;
 
@@ -41,18 +46,43 @@ app.post('/paircodes', (req, res) => {
   }
 
   const pairCodes = readPairCodes();
-
   if (pairCodes[code]) {
     return res.status(400).json({ error: 'Pair code already exists' });
   }
 
-  pairCodes[code] = phone;
+  pairCodes[code] = { phone, session: null }; // placeholder
   writePairCodes(pairCodes);
 
-  res.json({ message: 'Pair code added successfully', pairCodes });
+  res.json({ message: '✅ Pair code added successfully!' });
 });
 
-// Server start
+// Validate paircode and return session
+app.post('/validate', (req, res) => {
+  const { code, phone } = req.body;
+  const pairCodes = readPairCodes();
+
+  const entry = pairCodes[code];
+
+  if (!entry) {
+    return res.status(404).json({ error: '❌ Invalid code' });
+  }
+
+  if (entry.phone !== phone) {
+    return res.status(401).json({ error: '❌ Phone number mismatch' });
+  }
+
+  // Simulate session ID creation (in real use, fetch actual session)
+  const sessionId = `session-${Math.floor(100000 + Math.random() * 900000)}`;
+  pairCodes[code].session = sessionId;
+  writePairCodes(pairCodes);
+
+  // TODO: Send session ID via WhatsApp bot
+  console.log(`📤 Sending session ID "${sessionId}" to WhatsApp number: ${phone}`);
+
+  res.json({ message: '✅ Validated successfully!', sessionId });
+});
+
+// Start the server
 app.listen(PORT, () => {
-  console.log(`Pair Code Server running on port ${PORT}`);
+  console.log(`✅ Pair Code Server running on port ${PORT}`);
 });

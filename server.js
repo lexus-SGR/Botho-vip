@@ -1,16 +1,14 @@
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(express.static('public')); // serve frontend
 
-// File ya kuhifadhi paircodes
 const pairCodesPath = path.join(__dirname, 'paircodes.json');
 
-// Kusoma paircodes
 function readPairCodes() {
   if (!fs.existsSync(pairCodesPath)) {
     fs.writeFileSync(pairCodesPath, JSON.stringify({}));
@@ -18,23 +16,15 @@ function readPairCodes() {
   return JSON.parse(fs.readFileSync(pairCodesPath));
 }
 
-// Kuandika paircodes
 function writePairCodes(data) {
   fs.writeFileSync(pairCodesPath, JSON.stringify(data, null, 2));
 }
 
-// Root route
-app.get('/', (req, res) => {
-  res.send('✅ Botho VIP Pair Code Server is Online!');
-});
-
-// Orodha ya paircodes
 app.get('/paircodes', (req, res) => {
   const pairCodes = readPairCodes();
   res.json(pairCodes);
 });
 
-// Ongeza paircode mpya
 app.post('/paircodes', (req, res) => {
   const { code, phone } = req.body;
 
@@ -46,43 +36,44 @@ app.post('/paircodes', (req, res) => {
   }
 
   const pairCodes = readPairCodes();
+
   if (pairCodes[code]) {
     return res.status(400).json({ error: 'Pair code already exists' });
   }
 
-  pairCodes[code] = { phone, session: null }; // placeholder
+  pairCodes[code] = phone;
   writePairCodes(pairCodes);
 
-  res.json({ message: '✅ Pair code added successfully!' });
+  res.json({ message: 'Pair code added successfully', pairCodes });
 });
 
-// Validate paircode and return session
 app.post('/validate', (req, res) => {
   const { code, phone } = req.body;
+
+  if (!code || code.length !== 8) {
+    return res.status(400).json({ error: 'Code must be 8 digits' });
+  }
+  if (!phone || !phone.match(/^\d{10,15}$/)) {
+    return res.status(400).json({ error: 'Invalid phone number' });
+  }
+
   const pairCodes = readPairCodes();
 
-  const entry = pairCodes[code];
-
-  if (!entry) {
-    return res.status(404).json({ error: '❌ Invalid code' });
+  if (!pairCodes[code]) {
+    return res.status(404).json({ error: 'Pair code not found' });
   }
 
-  if (entry.phone !== phone) {
-    return res.status(401).json({ error: '❌ Phone number mismatch' });
+  if (pairCodes[code] !== phone) {
+    return res.status(403).json({ error: 'Phone number does not match the pair code' });
   }
 
-  // Simulate session ID creation (in real use, fetch actual session)
-  const sessionId = `session-${Math.floor(100000 + Math.random() * 900000)}`;
-  pairCodes[code].session = sessionId;
-  writePairCodes(pairCodes);
+  const sessionId = `SESSION-${Math.random().toString(36).substr(2, 10).toUpperCase()}`;
 
-  // TODO: Send session ID via WhatsApp bot
-  console.log(`📤 Sending session ID "${sessionId}" to WhatsApp number: ${phone}`);
+  console.log(`✅ Session ID for ${phone}: ${sessionId}`);
 
-  res.json({ message: '✅ Validated successfully!', sessionId });
+  return res.json({ sessionId });
 });
 
-// Start the server
 app.listen(PORT, () => {
   console.log(`✅ Pair Code Server running on port ${PORT}`);
 });

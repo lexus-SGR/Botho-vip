@@ -1,26 +1,10 @@
 services:
   - type: web
-    name: botho-vip-bot
+    name: pair-code-web
     env: node
     plan: free
-    branch: main
-    repo: https://github.com/lexus-SGR/Botho-vip.git
     buildCommand: npm install
-    startCommand: node index.js
+    startCommand: node server.js
     envVars:
-      - key: NODE_VERSION
-        value: 18.20.0
-      - key: AUTO_OPEN_VIEW_ONCE
-        value: on
-      - key: AUTO_VIEW_STATUS
-        value: on
-      - key: OWNER_NUMBER
-        value: "255760317060"
-      - key: PREFIX
-        value: "!"
-      - key: BOT_NAME
-        value: "Botho VIP Bot"
-      - key: MODE
-        value: "private"
-      - key: SESSION_DIR
-        value: "./session"
+      - key: NODE_ENV
+        value: production

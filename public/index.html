@@ -1,40 +1,49 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Botho VIP | Pair WhatsApp</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pair Bot - Ben Whittaker Tech</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="container">
-    <img src="ommy.png" alt="Bot Image" class="avatar">
-    <h1>🤖 Botho VIP</h1>
-    <p>Connect your WhatsApp below to get your <strong>Pair Code</strong></p>
+    <h1>🤖 Pair Your WhatsApp Bot</h1>
+    <p>Get your <strong>8-digit pair code</strong> and link your WhatsApp.</p>
     <form id="pairForm">
-      <input type="text" id="number" name="number" placeholder="Enter your WhatsApp number..." required>
+      <input type="text" id="phone" placeholder="Enter your WhatsApp number" required />
       <button type="submit">Generate Pair Code</button>
     </form>
-    <div id="response"></div>
-  </div>  <script>
-    document.getElementById('pairForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const number = document.getElementById('number').value;
-      const responseBox = document.getElementById('response');
+    <div id="result" class="hidden"></div>
+  </div>
 
-      const res = await fetch('/api/pair', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ number })
+  <script>
+    const form = document.getElementById("pairForm");
+    const result = document.getElementById("result");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const phone = document.getElementById("phone").value;
+
+      const res = await fetch("/pair", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
       });
 
       const data = await res.json();
+
       if (data.success) {
-        responseBox.innerHTML = `<p>Your Pair Code: <strong>${data.code}</strong><br/>Please send it to WhatsApp bot to complete the pairing.</p>`;
+        result.innerHTML = `
+          <p><strong>Your Pair Code:</strong> <code>${data.code}</code></p>
+          <p>A session will be sent to WhatsApp: <strong>${phone}</strong></p>
+        `;
       } else {
-        responseBox.innerHTML = `<p style="color:red;">${data.message}</p>`;
+        result.innerHTML = `<p>Error: ${data.message}</p>`;
       }
+
+      result.classList.remove("hidden");
     });
-  </script></body>
+  </script>
+</body>
 </html>

@@ -1,14 +1,29 @@
 {
   "name": "botho-vip",
   "version": "1.0.0",
-  "description": "Pair code generator and validator for WhatsApp bot",
+  "description": "Pair code generator and WhatsApp bot with multi services",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start-server": "node server.js",
+    "start-bot": "node index.js",
+    "start": "concurrently \"npm run start-server\" \"npm run start-bot\""
   },
   "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.16",
+    "axios": "^1.4.0",
+    "chalk": "^5.2.0",
+    "concurrently": "^8.0.1",
+    "dotenv": "^16.0.3",
+    "download": "^8.0.0",
     "express": "^4.18.2",
-    "fs": "^0.0.1-security",
-    "path": "^0.12.7"
+    "fs-extra": "^11.1.1",
+    "got": "^12.6.0",
+    "mime-types": "^2.1.35",
+    "moment": "^2.29.4",
+    "node-fetch": "^3.3.1",
+    "pino": "^8.0.0",
+    "qrcode": "^1.5.1",
+    "yt-search": "^2.10.6",
+    "ytdl-core": "^4.11.0"
   }
 }

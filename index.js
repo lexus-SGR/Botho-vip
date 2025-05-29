@@ -14,7 +14,6 @@ const {
   makeCacheableSignalKeyStore
 } = require("@whiskeysockets/baileys");
 
-// App config
 const app = express();
 app.get("/", (req, res) => res.send("Fatuma WhatsApp Bot is running!"));
 app.listen(process.env.PORT || 3000, () =>
@@ -22,7 +21,7 @@ app.listen(process.env.PORT || 3000, () =>
 );
 
 // Env Configs
-const OWNER_NUMBER = "255654478605"; // Namba yako imeweka hapa
+const OWNER_NUMBER = "255654478605";
 const OWNER_JID = OWNER_NUMBER + "@s.whatsapp.net";
 const PREFIX = "😁";
 const AUTO_BIO = true;
@@ -31,9 +30,8 @@ const ANTILINK_ENABLED = process.env.ANTILINK === "on";
 const AUTO_TYPING = process.env.AUTO_TYPING === "on";
 const RECORD_VOICE_FAKE = process.env.RECORD_VOICE_FAKE === "on";
 const AUTO_VIEW_STATUS = process.env.AUTO_VIEW_STATUS === "on";
-const AUTO_REACT_EMOJI = process.env.AUTO_REACT_EMOJI ||  "";
+const AUTO_REACT_EMOJI = process.env.AUTO_REACT_EMOJI || "";
 
-// Load Antilink settings
 let antiLinkGroups = {};
 try {
   antiLinkGroups = JSON.parse(fs.readFileSync('./antilink.json'));
@@ -41,7 +39,6 @@ try {
   fs.writeFileSync('./antilink.json', '{}');
 }
 
-// Start Bot
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("./auth");
   const { version } = await fetchLatestBaileysVersion();
@@ -91,7 +88,6 @@ async function startBot() {
     }
   });
 
-
   sock.ev.on('group-participants.update', async (update) => {
     const groupId = update.id;
     if (welcomeGroups.has(groupId)) {
@@ -100,7 +96,7 @@ async function startBot() {
           try {
             const groupMetadata = await sock.groupMetadata(groupId);
             const groupName = groupMetadata.subject;
-            const welcomeText = `👋 Hello @${participant.split('@')[0]}!\n\nWelcome to *${groupName}*.\nWe're glad to have you h>
+            const welcomeText = `👋 Hello @${participant.split('@')[0]}!\n\nWelcome to *${groupName}*.\nWe're glad to have you here!`;
             await sock.sendMessage(groupId, {
               text: welcomeText,
               mentions: [participant]
@@ -113,7 +109,6 @@ async function startBot() {
     }
   });
 
-  // Load commands (assuming commands folder and structure)
   const commands = new Map();
   const commandsPath = path.join(__dirname, "commands");
   if (!fs.existsSync(commandsPath)) fs.mkdirSync(commandsPath);
@@ -141,13 +136,12 @@ async function startBot() {
     const args = body.trim().split(/\s+/).slice(1);
     const command = commands.get(commandName);
 
-   // Owner check for commands
     if (command) {
-        try {
-            await command.execute(sock, msg, args, from, sender, isGroup);
-        } catch (err) {
-            console.error("Command error:", err);
-        }
+      try {
+        await command.execute(sock, msg, args, from, sender, isGroup);
+      } catch (err) {
+        console.error("Command error:", err);
+      }
     }
 
     let groupMetadata = {}, isAdmin = false, botIsAdmin = false;
@@ -169,38 +163,29 @@ async function startBot() {
     if (AUTO_VIEW_ONCE) {
       await handleViewOnceMessage(msg);
     }
-    
-if (ANTILINK_ENABLED && isGroup && antiLinkGroups[from]?.enabled) {
-  if (body.includes("https://chat.whatsapp.com")) {
-    if (!isAdmin && botIsAdmin) {
-      try {
-        // Delete the offending message
-        await sock.sendMessage(from, { delete: msg.key });
 
-        // Warn the user
-        await sock.sendMessage(from, {
-          text: `⚠️ @${sender.split("@")[0]}, you shared a forbidden link.\nYou will be removed from the group shortly.`,
-          mentions: [sender]
-        });
-
-        // Wait for 5 seconds before removing
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        // Remove the user from the group
-        await sock.groupParticipantsUpdate(from, [sender], "remove");
-
-        // Notify the group of the removal
-        await sock.sendMessage(from, {
-          text: `✅ @${sender.split("@")[0]} has been removed for sharing a forbidden link.`,
-          mentions: [sender]
-        });
-      } catch (e) {
-        console.error("❌ Error handling antilink:", e);
+    if (ANTILINK_ENABLED && isGroup && antiLinkGroups[from]?.enabled) {
+      if (body.includes("https://chat.whatsapp.com")) {
+        if (!isAdmin && botIsAdmin) {
+          try {
+            await sock.sendMessage(from, { delete: msg.key });
+            await sock.sendMessage(from, {
+              text: `⚠️ @${sender.split("@")[0]}, you shared a forbidden link.\nYou will be removed from the group shortly.`,
+              mentions: [sender]
+            });
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            await sock.groupParticipantsUpdate(from, [sender], "remove");
+            await sock.sendMessage(from, {
+              text: `✅ @${sender.split("@")[0]} has been removed for sharing a forbidden link.`,
+              mentions: [sender]
+            });
+          } catch (e) {
+            console.error("❌ Error handling antilink:", e);
+          }
+        }
       }
     }
-  }
-}
-    
+
     if (body.startsWith(`${PREFIX}antilink`) && isAdmin) {
       const option = args[0]?.toLowerCase();
       if (option === "on") {
@@ -233,37 +218,28 @@ if (ANTILINK_ENABLED && isGroup && antiLinkGroups[from]?.enabled) {
         await sock.sendMessage(from, { text: "👋 Welcome messages have been *disabled*." }, { quoted: msg });
       } else {
         welcomeGroups.add(from);
-        await sock.sendMessage(from, { text: "✅ Welcome messages have been *enabled*. New members will now get a welcome messag>
+        await sock.sendMessage(from, { text: "✅ Welcome messages have been *enabled*. New members will now get a welcome message." }, { quoted: msg });
       }
       return;
     }
-
   });
 
-async function handleViewOnceMessage(msg) {
+  async function handleViewOnceMessage(msg) {
     const viewOnce = msg.message?.viewOnceMessage;
     if (!viewOnce) return;
 
     try {
       const viewOnceContent = viewOnce.message;
       if (!viewOnceContent) return;
-
-      // Example: Forward the view-once message as normal message to the same chat
       const from = msg.key.remoteJid;
       await sock.sendMessage(from, {
         ...viewOnceContent,
-        viewOnce: true // Disable view once so it can be seen multiple times
+        viewOnce: true
       });
     } catch (error) {
       console.error("❌ Error handling view once message:", error);
     }
   }
-
-  // Start the bot
 }
 
 startBot().catch(err => console.error("Bot start error:", err));
-
-
-  
-    

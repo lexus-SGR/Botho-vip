@@ -169,29 +169,38 @@ async function startBot() {
     if (AUTO_VIEW_ONCE) {
       await handleViewOnceMessage(msg);
     }
+    
+if (ANTILINK_ENABLED && isGroup && antiLinkGroups[from]?.enabled) {
+  if (body.includes("https://chat.whatsapp.com")) {
+    if (!isAdmin && botIsAdmin) {
+      try {
+        // Delete the offending message
+        await sock.sendMessage(from, { delete: msg.key });
 
-    // Antilink implementation with !antilink command
-    if (ANTILINK_ENABLED && isGroup && antiLinkGroups[from]?.enabled) {
-      if (body.includes("https://chat.whatsapp.com")) {
-        if (!isAdmin && botIsAdmin) {
-          try {
-            await sock.sendMessage(from, { delete: msg.key });
-            await sock.sendMessage(from, {
-              text: `⚠️ @${sender.split("@")[0]}, you shared a forbidden link.\nYou will be removed from the group shortly.`,
-              mentions: [sender]
-            });
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            await sock.groupParticipantsUpdate(from, [sender], "remove");
-            await sock.sendMessage(from, {
-              text: `✅ @${sender.split("@")[0]} has been removed for sharing a forbidden link.`,
-              mentions: [sender]
-            });
-          } catch (e) {
-            console.error("❌ Error handling antilink:", e);
-          }
-        }
+        // Warn the user
+        await sock.sendMessage(from, {
+          text: `⚠️ @${sender.split("@")[0]}, you shared a forbidden link.\nYou will be removed from the group shortly.`,
+          mentions: [sender]
+        });
+
+        // Wait for 5 seconds before removing
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // Remove the user from the group
+        await sock.groupParticipantsUpdate(from, [sender], "remove");
+
+        // Notify the group of the removal
+        await sock.sendMessage(from, {
+          text: `✅ @${sender.split("@")[0]} has been removed for sharing a forbidden link.`,
+          mentions: [sender]
+        });
+      } catch (e) {
+        console.error("❌ Error handling antilink:", e);
       }
     }
+  }
+}
+    
     if (body.startsWith(`${PREFIX}antilink`) && isAdmin) {
       const option = args[0]?.toLowerCase();
       if (option === "on") {

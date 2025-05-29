@@ -2,6 +2,7 @@
   "name": "botho-vip",
   "version": "1.0.0",
   "description": "Pair code generator and WhatsApp bot with multi services",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start-server": "node server.js",

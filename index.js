@@ -89,7 +89,7 @@ async function startBot() {
           "Education is the most powerful weapon.",
           "Entertainment is the spark of learning!",
         ];
-        const newBio = `👑 Ben Whittaker | 👤 Fatuma | 📅 ${dateStr} | ✨ ${
+        const newBio = `👑 lovenes-cyber | 👤 herieth | 📅 ${dateStr} | ✨ ${
           quotes[Math.floor(Math.random() * quotes.length)]
         }`;
         try {
@@ -136,7 +136,7 @@ async function startBot() {
 
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
-    if (!msg.message) return;
+    if (😁msg.message) return;
 
     const from = msg.key.remoteJid;
     const isGroup = from.endsWith("@g.us");
@@ -160,9 +160,9 @@ async function startBot() {
       botIsAdmin = false;
     if (isGroup) {
       groupMetadata = await sock.groupMetadata(from);
-      isAdmin = groupMetadata.participants.find((p) => p.id === sender)?.admin != null;
+      isAdmin = groupMetadata.participants.find((p) => p.id === sender)?.admin 😁= null;
       const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
-      botIsAdmin = groupMetadata.participants.find((p) => p.id === botJid)?.admin != null;
+      botIsAdmin = groupMetadata.participants.find((p) => p.id === botJid)?.admin 😁= null;
     }
 
     if (AUTO_TYPING) await sock.sendPresenceUpdate("composing", from);
@@ -201,7 +201,7 @@ async function startBot() {
     }
 
     // Antilink on/off commands for admins
-    if (body.startsWith("!antilink") && isAdmin) {
+    if (body.startsWith("😁antilink") && isAdmin) {
       const option = args[0]?.toLowerCase();
       if (option === "on") {
         antiLinkGroups[from] = { enabled: true };
@@ -219,7 +219,7 @@ async function startBot() {
     }
 
     // Toggle welcome messages in group
-    if (body === "!welcome") {
+    if (body === "😁welcome") {
       if (!isGroup) {
         await sock.sendMessage(from, { text: "❌ This command is for groups only." }, { quoted: msg });
         return;

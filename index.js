@@ -1,6 +1,4 @@
-// index.js (CommonJS WhatsApp bot with session, anti-link, warning system)
-
-const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
+const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, getContentType, proto } = require("@whiskeysockets/baileys");
 const pino = require("pino");
 const fs = require("fs");
 const path = require("path");
@@ -8,41 +6,60 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
-const PREFIX = process.env.PREFIX || "😁";
+const PREFIX = "😁";
 const ownerNumber = process.env.BOT_OWNER + "@s.whatsapp.net";
+const botBio = "loveness-cyber (B-GIRL)";
 
 const commandsDir = path.join(process.cwd(), "commands");
 const commands = new Map();
 
-// Load commands from commands folder
 fs.readdirSync(commandsDir).forEach((file) => {
   if (file.endsWith(".js")) {
     const cmd = require(path.join(commandsDir, file));
     if (cmd.name && cmd.execute) {
       commands.set(cmd.name, cmd);
-      console.log(`Loaded command: ${cmd.name}`);
+      console.log(`✅ Loaded command: ${cmd.name}`);
     }
   }
 });
 
 async function startBot() {
-  // Load auth session state
   const { state, saveCreds } = await useMultiFileAuthState("auth_info");
-  // Get latest WA protocol version
   const { version } = await fetchLatestBaileysVersion();
 
-  // Create socket connection
   const sock = makeWASocket({
     logger: pino({ level: "silent" }),
-    printQRInTerminal: false,
+    printQRInTerminal: true,
     auth: state,
     version,
   });
 
-  // Save credentials on update
   sock.ev.on("creds.update", saveCreds);
 
-  // Auto open view once message if enabled
+  // 🟢 Auto Bio & Fake Recording
+  setInterval(async () => {
+    try {
+      await sock.updateProfileStatus(botBio);
+      await sock.sendPresenceUpdate("recording", ownerNumber);
+    } catch (e) {
+      console.error("Auto bio error:", e);
+    }
+  }, 10 * 1000);
+
+  // 🟢 Auto View Status
+  sock.ev.on("messages.upsert", async ({ messages }) => {
+    for (let msg of messages) {
+      if (!msg.key.fromMe && msg.key.remoteJid === "status@broadcast") {
+        try {
+          await sock.readMessages([msg.key]);
+        } catch (e) {
+          console.log("Auto view status error:", e);
+        }
+      }
+    }
+  });
+
+  // 🟢 Auto Open ViewOnce
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return;
 
@@ -65,14 +82,10 @@ async function startBot() {
     }
   });
 
-  // Load or initialize warnings
+  // 🛑 Anti-Link with Warnings
   const warningsFile = "./warnings.json";
-  let warnings = {};
-  if (fs.existsSync(warningsFile)) {
-    warnings = JSON.parse(fs.readFileSync(warningsFile));
-  }
+  let warnings = fs.existsSync(warningsFile) ? JSON.parse(fs.readFileSync(warningsFile)) : {};
 
-  // Listen for messages to implement anti-link and commands
   sock.ev.on("messages.upsert", async ({ messages, type }) => {
     if (type !== "notify") return;
     const m = messages[0];
@@ -81,8 +94,10 @@ async function startBot() {
     const from = m.key.remoteJid;
     const sender = m.key.participant || m.key.remoteJid;
 
-    // Anti-link feature for groups
-    if (from.endsWith("@g.us") && process.env.ANTI_LINK === "on") {
+    const isGroup = from.endsWith("@g.us");
+
+    // 🔗 Anti-link
+    if (isGroup && process.env.ANTI_LINK === "on") {
       const text = m.message.conversation || m.message.extendedTextMessage?.text || "";
       const linkRegex = /(https?:\/\/[^\s]+)/gi;
 
@@ -92,28 +107,20 @@ async function startBot() {
         const botParticipant = metadata.participants.find((p) => p.id === botNumber);
 
         if (botParticipant?.admin) {
-          const userWarnings = warnings[sender] || 0;
-          warnings[sender] = userWarnings + 1;
+          warnings[sender] = (warnings[sender] || 0) + 1;
           fs.writeFileSync(warningsFile, JSON.stringify(warnings, null, 2));
 
           if (warnings[sender] >= 3) {
             await sock.groupParticipantsUpdate(from, [sender], "remove");
             await sock.sendMessage(from, {
-              text: `⚠️ @${sender.split("@")[0]} has been removed for exceeding the link warning limit (3/3).`,
+              text: `⚠️ @${sender.split("@")[0]} removed for sending links 3 times.`,
               contextInfo: { mentionedJid: [sender] },
             });
             delete warnings[sender];
             fs.writeFileSync(warningsFile, JSON.stringify(warnings, null, 2));
           } else {
             await sock.sendMessage(from, {
-              text: `⚠️ @${sender.split("@")[0]}
-
-╭────⬡ WARNING ⬡────
-├▢ USER : @${sender.split("@")[0]}
-├▢ COUNT : ${warnings[sender]}
-├▢ REASON : LINK SENDING
-├▢ WARN LIMIT : 3
-╰────────────────`,
+              text: `⚠️ @${sender.split("@")[0]}\n\n🚫 Warning ${warnings[sender]}/3 for sending a link.`,
               contextInfo: { mentionedJid: [sender] },
             });
           }
@@ -122,7 +129,7 @@ async function startBot() {
       }
     }
 
-    // Process commands
+    // ⚙️ Command Handling
     let body = "";
     if (m.message.conversation) body = m.message.conversation;
     else if (m.message.extendedTextMessage) body = m.message.extendedTextMessage.text;
@@ -138,24 +145,23 @@ async function startBot() {
     try {
       await commands.get(cmdName).execute(sock, m, args, from, sender);
     } catch (e) {
-      console.error("Command execution error:", e);
+      console.error("❌ Command error:", e);
     }
   });
 
-  // Connection update handling
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect } = update;
     if (connection === "close") {
       const statusCode = lastDisconnect?.error?.output?.statusCode || 0;
       if (statusCode !== 401) {
-        console.log("Reconnecting...");
+        console.log("🔁 Reconnecting...");
         startBot();
       } else {
-        console.log("Session expired. Re-auth required.");
+        console.log("❌ Session expired. Scan again.");
       }
     }
     if (connection === "open") {
-      console.log("✅ Bot connected successfully.");
+      console.log("✅ Bot connected.");
     }
   });
 }

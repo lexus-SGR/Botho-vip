@@ -160,9 +160,9 @@ async function startBot() {
       botIsAdmin = false;
     if (isGroup) {
       groupMetadata = await sock.groupMetadata(from);
-      isAdmin = groupMetadata.participants.find((p) => p.id === sender)?.admin 😁= null;
+      isAdmin = groupMetadata.participants.find((p) => p.id === sender)?.admin != null;
       const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
-      botIsAdmin = groupMetadata.participants.find((p) => p.id === botJid)?.admin 😁= null;
+      botIsAdmin = groupMetadata.participants.find((p) => p.id === botJid)?.admin != null;
     }
 
     if (AUTO_TYPING) await sock.sendPresenceUpdate("composing", from);

@@ -121,19 +121,15 @@ async function startBot() {
       }
     }
   });
-  
-const commands = new Map();
-const commandsPath = path.join(__dirname, "commands");
+  const commands = new Map();
+  const commandsPath = path.join(__dirname, "commands");
+  if (!fs.existsSync(commandsPath)) fs.mkdirSync(commandsPath);
 
-fs.readdirSync(commandsPath).forEach((file) => {
-  if (file.endsWith(".js")) {
-    const command = require(path.join(commandsPath, file));
-    if (command.name) {
-      commands.set(command.name.toLowerCase(), command);
-      console.log(`✅ Loaded command: ${command.name}`);
-    }
-  }
-});
+  fs.readdirSync(commandsPath).filter(f => f.endsWith(".js")).forEach(file => {
+    const cmd = require(path.join(commandsPath, file));
+    if (cmd.name) commands.set(cmd.name.toLowerCase(), cmd);
+  });
+
   
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];

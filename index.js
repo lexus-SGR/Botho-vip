@@ -1,18 +1,24 @@
-require('events').EventEmitter.defaultMaxListeners = 100;
-require("dotenv").config();
-const express = require("express");
+import events from 'events';
+events.EventEmitter.defaultMaxListeners = 100;
+
+import dotenv from 'dotenv';
+dotenv.config();
+
+import express from 'express';
 const welcomeGroups = new Set();
-const fs = require("fs");
-const path = require("path");
-const P = require("pino");
-const qrcode = require("qrcode-terminal");
-const {
+
+import fs from 'fs';
+import path from 'path';
+import P from 'pino';
+import qrcode from 'qrcode-terminal';
+
+import {
   makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore
-} = require("@whiskeysockets/baileys");
+} from '@whiskeysockets/baileys';
 
 const app = express();
 app.get("/", (req, res) => res.send("Fatuma WhatsApp Bot is running!"));

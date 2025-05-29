@@ -20,7 +20,6 @@ app.listen(process.env.PORT || 3000, () =>
   console.log("Server running on port " + (process.env.PORT || 3000))
 );
 
-// Env Configs
 const OWNER_NUMBER = "255654478605";
 const OWNER_JID = OWNER_NUMBER + "@s.whatsapp.net";
 const PREFIX = "😁";
@@ -34,10 +33,12 @@ const AUTO_REACT_EMOJI = process.env.AUTO_REACT_EMOJI || "";
 
 let antiLinkGroups = {};
 try {
-  antiLinkGroups = JSON.parse(fs.readFileSync('./antilink.json'));
+  antiLinkGroups = JSON.parse(fs.readFileSync('./antilink.json', 'utf8'));
 } catch {
   fs.writeFileSync('./antilink.json', '{}');
 }
+
+let isReconnecting = false;
 
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("./auth");
@@ -56,9 +57,22 @@ async function startBot() {
 
   sock.ev.on("connection.update", async ({ connection, qr, lastDisconnect }) => {
     if (qr) qrcode.generate(qr, { small: true });
+
     if (connection === "close") {
-      const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-      if (shouldReconnect) startBot();
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const reason = DisconnectReason[statusCode] || statusCode;
+      console.log(`Connection closed, reason: ${reason}`);
+
+      if (statusCode !== DisconnectReason.loggedOut) {
+        if (!isReconnecting) {
+          isReconnecting = true;
+          console.log("Reconnecting...");
+          await startBot();
+          isReconnecting = false;
+        }
+      } else {
+        console.log("Logged out. Please delete auth folder and restart.");
+      }
     } else if (connection === "open") {
       console.log("✅ Bot connected!");
       const welcomeText = `
@@ -109,6 +123,7 @@ async function startBot() {
     }
   });
 
+  // Load commands once on start
   const commands = new Map();
   const commandsPath = path.join(__dirname, "commands");
   if (!fs.existsSync(commandsPath)) fs.mkdirSync(commandsPath);
@@ -120,7 +135,7 @@ async function startBot() {
 
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
-    if (!msg.message) return;
+    if (!msg.message || msg.key.fromMe) return;
 
     const from = msg.key.remoteJid;
     const isGroup = from.endsWith("@g.us");
@@ -136,14 +151,6 @@ async function startBot() {
     const args = body.trim().split(/\s+/).slice(1);
     const command = commands.get(commandName);
 
-    if (command) {
-      try {
-        await command.execute(sock, msg, args, from, sender, isGroup);
-      } catch (err) {
-        console.error("Command error:", err);
-      }
-    }
-
     let groupMetadata = {}, isAdmin = false, botIsAdmin = false;
     if (isGroup) {
       groupMetadata = await sock.groupMetadata(from);
@@ -152,12 +159,25 @@ async function startBot() {
       botIsAdmin = groupMetadata.participants.find(p => p.id === botJid)?.admin != null;
     }
 
+    if (command) {
+      try {
+        // Pass also admin info in case command needs it
+        await command.execute(sock, msg, args, from, sender, isGroup, { isAdmin, botIsAdmin, ownerJid: OWNER_JID });
+      } catch (err) {
+        console.error("Command error:", err);
+      }
+    }
+
     if (AUTO_TYPING) await sock.sendPresenceUpdate('composing', from);
     if (RECORD_VOICE_FAKE) await sock.sendPresenceUpdate('recording', from);
     if (AUTO_REACT_EMOJI) {
-      await sock.sendMessage(from, {
-        react: { text: AUTO_REACT_EMOJI, key: msg.key }
-      });
+      try {
+        await sock.sendMessage(from, {
+          react: { text: AUTO_REACT_EMOJI, key: msg.key }
+        });
+      } catch (e) {
+        console.error("❌ Auto react error:", e.message);
+      }
     }
 
     if (AUTO_VIEW_ONCE) {
@@ -186,15 +206,23 @@ async function startBot() {
       }
     }
 
-    if (body.startsWith(`${PREFIX}antilink`) && isAdmin) {
+    if (body.startsWith(`${PREFIX}antilink`) && (isAdmin || sender === OWNER_JID)) {
       const option = args[0]?.toLowerCase();
       if (option === "on") {
         antiLinkGroups[from] = { enabled: true };
-        fs.writeFileSync('./antilink.json', JSON.stringify(antiLinkGroups, null, 2));
+        try {
+          fs.writeFileSync('./antilink.json', JSON.stringify(antiLinkGroups, null, 2));
+        } catch (e) {
+          console.error("❌ Error writing antilink.json:", e);
+        }
         await sock.sendMessage(from, { text: "✅ Antilink enabled." });
       } else if (option === "off") {
         delete antiLinkGroups[from];
-        fs.writeFileSync('./antilink.json', JSON.stringify(antiLinkGroups, null, 2));
+        try {
+          fs.writeFileSync('./antilink.json', JSON.stringify(antiLinkGroups, null, 2));
+        } catch (e) {
+          console.error("❌ Error writing antilink.json:", e);
+        }
         await sock.sendMessage(from, { text: "❎ Antilink disabled." });
       } else {
         const status = antiLinkGroups[from]?.enabled ? "✅ ON" : "❎ OFF";
@@ -234,7 +262,7 @@ async function startBot() {
       const from = msg.key.remoteJid;
       await sock.sendMessage(from, {
         ...viewOnceContent,
-        viewOnce: true
+        viewOnce: false // to disable viewOnce, so they can view again
       });
     } catch (error) {
       console.error("❌ Error handling view once message:", error);

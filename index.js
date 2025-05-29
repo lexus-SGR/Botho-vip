@@ -129,15 +129,34 @@ async function startBot() {
     }
   });
 
-  // Load commands once on start
+// Pata __dirname kwa ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Function async kupakia commands
+async function loadCommands() {
   const commands = new Map();
   const commandsPath = path.join(__dirname, "commands");
-  if (!fs.existsSync(commandsPath)) fs.mkdirSync(commandsPath);
+  
+  if (!fs.existsSync(commandsPath)) {
+    fs.mkdirSync(commandsPath);
+  }
 
-  fs.readdirSync(commandsPath).filter(f => f.endsWith(".js")).forEach(file => {
-    const cmd = require(path.join(commandsPath, file));
+  const commandFiles = fs.readdirSync(commandsPath).filter(f => f.endsWith(".js"));
+
+  for (const file of commandFiles) {
+    const cmdModule = await import(path.join(commandsPath, file));
+    const cmd = cmdModule.default || cmdModule;
     if (cmd.name) commands.set(cmd.name.toLowerCase(), cmd);
-  });
+  }
+  return commands;
+}
+
+(async () => {
+  const commands = await loadCommands();
+  console.log("Commands loaded:", Array.from(commands.keys()));
+  // Endelea na bot start au server start hapa
+})
 
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];

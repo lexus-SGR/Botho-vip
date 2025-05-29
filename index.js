@@ -121,19 +121,20 @@ async function startBot() {
       }
     }
   });
+  
+const commands = new Map();
+const commandsPath = path.join(__dirname, "commands");
 
-  // Commands map (can be expanded)
-  const commands = new Map();
-
-  // Example command: !ping
-  commands.set("ping", {
-    name: "ping",
-    description: "Replies with Pong!",
-    async execute(sock, msg, args, from, sender, isGroup) {
-      await sock.sendMessage(from, { text: "🏓 Pong!" }, { quoted: msg });
-    },
-  });
-
+fs.readdirSync(commandsPath).forEach((file) => {
+  if (file.endsWith(".js")) {
+    const command = require(path.join(commandsPath, file));
+    if (command.name) {
+      commands.set(command.name.toLowerCase(), command);
+      console.log(`✅ Loaded command: ${command.name}`);
+    }
+  }
+});
+  
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
     if (!msg.message) return;

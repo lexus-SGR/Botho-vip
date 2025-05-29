@@ -25,7 +25,7 @@ app.listen(process.env.PORT || 3000, () =>
 // Config variables from .env
 const OWNER_NUMBER = process.env.OWNER_NUMBER || "255654478605";
 const OWNER_JID = OWNER_NUMBER + "@s.whatsapp.net";
-const PREFIX = "!";
+const PREFIX = "😁";
 const AUTO_BIO = true;
 const AUTO_VIEW_ONCE = process.env.AUTO_VIEW_ONCE === "on";
 const ANTILINK_ENABLED = process.env.ANTILINK === "on";

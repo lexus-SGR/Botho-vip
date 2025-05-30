@@ -12,13 +12,14 @@ import { Boom } from '@hapi/boom';
 import qrcode from 'qrcode-terminal';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import {
+import baileys from '@whiskeysockets/baileys';
+const {
   makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeInMemoryStore
-} from '@whiskeysockets/baileys';
+} = baileys;
 
 // Needed for resolving __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);

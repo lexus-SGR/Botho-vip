@@ -29,7 +29,6 @@
     "pdf-lib": "^1.17.1",
     "deepai": "^1.0.6",
     "serpapi": "^2.0.0",
-    "tenorjs": "^1.0.5",
-    "voicerss-tts": "^1.0.2"
+    "tenorjs": "^1.0.5"
   }
 }

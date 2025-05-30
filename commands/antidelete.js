@@ -7,8 +7,13 @@ module.exports = {
   usage: "antidelete on/off",
   react: "🛑",
   sudo: true,
-  async execute(sock, msg, args, from, sender) {
-    const option = args[0];
+  get status() {
+    return antiDeleteEnabled;
+  },
+  async execute(sock, msg, args, options) {
+    const { from } = options;
+    const option = args[0]?.toLowerCase();
+
     if (option === "on") {
       antiDeleteEnabled = true;
       await sock.sendMessage(from, { text: "✅ Anti-delete is now *enabled*" }, { quoted: msg });
@@ -16,7 +21,7 @@ module.exports = {
       antiDeleteEnabled = false;
       await sock.sendMessage(from, { text: "❌ Anti-delete is now *disabled*" }, { quoted: msg });
     } else {
-      await sock.sendMessage(from, { text: "Usage: antidelete on/off" }, { quoted: msg });
+      await sock.sendMessage(from, { text: "⚙️ Usage: antidelete on/off" }, { quoted: msg });
     }
   }
 };

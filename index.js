@@ -1,263 +1,71 @@
-require('events').EventEmitter.defaultMaxListeners = 100;
-require("dotenv").config();
+// loveness-cybermqui WhatsApp Bot - Full index.js
 
-const express = require("express");
-const fs = require("fs");
-const path = require("path");
-const P = require("pino");
-const qrcode = require("qrcode-terminal");
+import makeWASocket, { DisconnectReason, useMultiFileAuthState, fetchLatestBaileysVersion, makeInMemoryStore } from '@whiskeysockets/baileys'; import { Boom } from '@hapi/boom'; import fs from 'fs'; import pino from 'pino'; import dotenv from 'dotenv'; import path from 'path';
 
-const {
-  makeWASocket,
-  useMultiFileAuthState,
-  DisconnectReason,
-  fetchLatestBaileysVersion,
-  makeCacheableSignalKeyStore,
-} = require("@whiskeysockets/baileys");
+dotenv.config();
 
-// Express server setup
-const app = express();
-app.get("/", (req, res) => res.send("Fatuma WhatsApp Bot is running!"));
-app.listen(process.env.PORT || 3000, () =>
-  console.log("Server running on port " + (process.env.PORT || 3000))
-);
+const prefix = '😁'; const ownerNumber = '255654478605'; const botName = 'loveness-cybermqui';
 
-// Config variables from .env
-const OWNER_NUMBER = process.env.OWNER_NUMBER || "255654478605";
-const OWNER_JID = OWNER_NUMBER + "@s.whatsapp.net";
-const PREFIX = "😁";
-const AUTO_BIO = true;
-const AUTO_VIEW_ONCE = process.env.AUTO_VIEW_ONCE === "on";
-const ANTILINK_ENABLED = process.env.ANTILINK === "on";
-const AUTO_TYPING = process.env.AUTO_TYPING === "on";
-const RECORD_VOICE_FAKE = process.env.RECORD_VOICE_FAKE === "on";
-const AUTO_VIEW_STATUS = process.env.AUTO_VIEW_STATUS === "on";
-const AUTO_REACT_EMOJI = process.env.AUTO_REACT_EMOJI || "";
+const store = makeInMemoryStore({ logger: pino().child({ level: 'silent', stream: 'store' }) }); store.readFromFile('./baileys_store.json'); setInterval(() => store.writeToFile('./baileys_store.json'), 10000);
 
-const welcomeGroups = new Set();
+// Load commands dynamically from the commands folder const commands = new Map(); const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js')); for (const file of commandFiles) { const command = await import(./commands/${file}); commands.set(command.name, command.execute); }
 
-// Load antilink settings file or create it
-let antiLinkGroups = {};
-try {
-  antiLinkGroups = JSON.parse(fs.readFileSync("./antilink.json"));
-} catch {
-  fs.writeFileSync("./antilink.json", "{}");
-  antiLinkGroups = {};
+const startSock = async () => { const { state, saveCreds } = await useMultiFileAuthState('./auth'); const { version } = await fetchLatestBaileysVersion(); const sock = makeWASocket({ version, auth: state, printQRInTerminal: true, logger: pino({ level: 'silent' }), browser: ['Loveness-Cybermqui', 'Safari', '1.0'] });
+
+store.bind(sock.ev);
+
+sock.ev.on('creds.update', saveCreds);
+
+sock.ev.on('connection.update', (update) => { const { connection, lastDisconnect } = update; if (connection === 'close') { const shouldReconnect = (lastDisconnect.error = new Boom(lastDisconnect?.error))?.output?.statusCode !== DisconnectReason.loggedOut; if (shouldReconnect) startSock(); } else if (connection === 'open') { console.log('✅ Connected to WhatsApp'); } });
+
+sock.ev.on('group-participants.update', async (update) => { const metadata = await sock.groupMetadata(update.id); const name = metadata.subject; for (const participant of update.participants) { if (update.action === 'add') { await sock.sendMessage(update.id, { text: 👋 Welcome @${participant.split('@')[0]} to *${name}*!, mentions: [participant] }); } else if (update.action === 'remove') { await sock.sendMessage(update.id, { text: 😢 Goodbye @${participant.split('@')[0]}!, mentions: [participant] }); } } });
+
+sock.ev.on('messages.upsert', async ({ messages }) => { const msg = messages[0]; if (!msg.message || msg.key.fromMe) return; const from = msg.key.remoteJid; const type = Object.keys(msg.message)[0]; const body = msg.message?.conversation || msg.message?.extendedTextMessage?.text || ''; const isGroup = from.endsWith('@g.us'); const sender = isGroup ? msg.key.participant : from;
+
+// Auto View Status
+if (from.includes('status@broadcast')) {
+  await sock.readMessages([msg.key]);
 }
 
-async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState("./auth");
-  const { version } = await fetchLatestBaileysVersion();
+// Auto ViewOnce Open & Resend
+if (type === 'viewOnceMessageV2') {
+  const originalMsg = msg.message.viewOnceMessageV2.message;
+  const mediaType = Object.keys(originalMsg)[0];
+  await sock.sendMessage(from, { [mediaType]: originalMsg[mediaType] }, { quoted: msg });
+}
 
-  const sock = makeWASocket({
-    version,
-    auth: {
-      creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, P({ level: "silent" })),
-    },
-    logger: P({ level: "silent" }),
-  });
-
-  sock.ev.on("creds.update", saveCreds);
-
-  sock.ev.on("connection.update", async ({ connection, qr, lastDisconnect }) => {
-    if (qr) qrcode.generate(qr, { small: true });
-
-    if (connection === "close") {
-      const shouldReconnect =
-        (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-      if (shouldReconnect) startBot();
-    } else if (connection === "open") {
-      console.log("✅ Bot connected!");
-      const welcomeText = `
-🔰 *WELCOME TO FATUMA WHATSAPP BOT* 🔰
-✅ *Bot Connected Successfully!*
-👑 *Owner:* @${OWNER_NUMBER}
-ℹ️ Type *${PREFIX}menu* or *${PREFIX}help* for commands.
-      `;
-      await sock.sendMessage(OWNER_JID, {
-        text: welcomeText,
-        mentions: [OWNER_JID],
-      });
-
-      if (AUTO_BIO) {
-        const dateStr = new Date().toLocaleDateString("en-GB");
-        const quotes = [
-          "Learning never exhausts the mind.",
-          "Laughter is timeless, imagination has no age.",
-          "The best way to predict the future is to create it.",
-          "Education is the most powerful weapon.",
-          "Entertainment is the spark of learning!",
-        ];
-        const newBio = `👑 lovenes-cyber | 👤 herieth | 📅 ${dateStr} | ✨ ${
-          quotes[Math.floor(Math.random() * quotes.length)]
-        }`;
-        try {
-          await sock.updateProfileStatus(newBio);
-        } catch (e) {
-          console.error("❌ Failed to update bio:", e.message);
-        }
-      }
-    }
-  });
-
-  sock.ev.on("group-participants.update", async (update) => {
-    const groupId = update.id;
-    if (welcomeGroups.has(groupId)) {
-      for (const participant of update.participants) {
-        if (update.action === "add") {
-          try {
-            const groupMetadata = await sock.groupMetadata(groupId);
-            const groupName = groupMetadata.subject;
-            const welcomeText = `👋 Hello @${participant.split("@")[0]}!\n\nWelcome to *${groupName}*.\nWe're glad to have you here. Please introduce yourself and follow the rules.`;
-            await sock.sendMessage(groupId, {
-              text: welcomeText,
-              mentions: [participant],
-            });
-          } catch (e) {
-            console.error("❌ Error sending welcome message:", e.message);
-          }
-        }
-      }
-    }
-  });
-  const commands = new Map();
-  const commandsPath = path.join(__dirname, "commands");
-  if (!fs.existsSync(commandsPath)) fs.mkdirSync(commandsPath);
-
-  fs.readdirSync(commandsPath).filter(f => f.endsWith(".js")).forEach(file => {
-    const cmd = require(path.join(commandsPath, file));
-    if (cmd.name) commands.set(cmd.name.toLowerCase(), cmd);
-  });
-
-  
-  sock.ev.on("messages.upsert", async ({ messages }) => {
-    const msg = messages[0];
-    if (!msg.message) return;
-
-    const from = msg.key.remoteJid;
-    const isGroup = from.endsWith("@g.us");
-    const sender = msg.key.participant || msg.key.remoteJid;
-    const body =
-      msg.message?.conversation ||
-      msg.message?.extendedTextMessage?.text ||
-      msg.message?.imageMessage?.caption ||
-      "";
-
-    const commandName = body.startsWith(PREFIX)
-      ? body.slice(PREFIX.length).split(/\s+/)[0].toLowerCase()
-      : null;
-
-    const args = body.trim().split(/\s+/).slice(1);
-    const command = commands.get(commandName);
-
-    // Check group metadata and admin
-    let groupMetadata = {},
-      isAdmin = false,
-      botIsAdmin = false;
-    if (isGroup) {
-      groupMetadata = await sock.groupMetadata(from);
-      isAdmin = groupMetadata.participants.find((p) => p.id === sender)?.admin != null;
-      const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
-      botIsAdmin = groupMetadata.participants.find((p) => p.id === botJid)?.admin != null;
-    }
-
-    if (AUTO_TYPING) await sock.sendPresenceUpdate("composing", from);
-    if (RECORD_VOICE_FAKE) await sock.sendPresenceUpdate("recording", from);
-    if (AUTO_REACT_EMOJI) {
-      await sock.sendMessage(from, {
-        react: { text: AUTO_REACT_EMOJI, key: msg.key },
-      });
-    }
-
-    if (AUTO_VIEW_ONCE) {
-      await handleViewOnceMessage(msg, sock);
-    }
-
-    // Anti-link
-    if (ANTILINK_ENABLED && isGroup && antiLinkGroups[from]?.enabled) {
-      if (body.includes("https://chat.whatsapp.com")) {
-        if (!isAdmin && botIsAdmin) {
-          try {
-            await sock.sendMessage(from, { delete: msg.key });
-            await sock.sendMessage(from, {
-              text: `⚠️ @${sender.split("@")[0]}, you shared a forbidden link.\nYou will be removed from the group shortly.`,
-              mentions: [sender],
-            });
-            await new Promise((r) => setTimeout(r, 5000));
-            await sock.groupParticipantsUpdate(from, [sender], "remove");
-            await sock.sendMessage(from, {
-              text: `✅ @${sender.split("@")[0]} has been removed for sharing a forbidden link.`,
-              mentions: [sender],
-            });
-          } catch (e) {
-            console.error("❌ Error handling antilink:", e);
-          }
-        }
-      }
-    }
-
-    // Antilink on/off commands for admins
-    if (body.startsWith("😁antilink") && isAdmin) {
-      const option = args[0]?.toLowerCase();
-      if (option === "on") {
-        antiLinkGroups[from] = { enabled: true };
-        fs.writeFileSync("./antilink.json", JSON.stringify(antiLinkGroups, null, 2));
-        await sock.sendMessage(from, { text: "✅ Antilink enabled." });
-      } else if (option === "off") {
-        delete antiLinkGroups[from];
-        fs.writeFileSync("./antilink.json", JSON.stringify(antiLinkGroups, null, 2));
-        await sock.sendMessage(from, { text: "❎ Antilink disabled." });
-      } else {
-        const status = antiLinkGroups[from]?.enabled ? "✅ ON" : "❎ OFF";
-        await sock.sendMessage(from, { text: `Antilink is: *${status}*` });
-      }
-      return;
-    }
-
-    // Toggle welcome messages in group
-    if (body === "😁welcome") {
-      if (!isGroup) {
-        await sock.sendMessage(from, { text: "❌ This command is for groups only." }, { quoted: msg });
-        return;
-      }
-      if (!isAdmin) {
-        await sock.sendMessage(from, { text: "❌ Only admins can use this command." }, { quoted: msg });
-        return;
-      }
-
-      if (welcomeGroups.has(from)) {
-        welcomeGroups.delete(from);
-        await sock.sendMessage(from, {
-          text: "👋 Welcome messages have been *disabled*.",
-        }, { quoted: msg });
-      } else {
-        welcomeGroups.add(from);
-        await sock.sendMessage(from, {
-          text: "✅ Welcome messages have been *enabled*. New members will now get a welcome message.",
-        }, { quoted: msg });
-      }
-      return;
-    }
-
-    // Run command if found
-    if (commandName && command) {
-      try {
-        await command.execute(sock, msg, args, from, sender, isGroup, groupMetadata, isAdmin);
-      } catch (err) {
-        console.error(`❌ Error in command "${commandName}":`, err);
-      }
-    }
-  });
-
-  async function handleViewOnceMessage(msg, sock) {
-    const viewOnce = msg.message?.viewOnceMessage?.message;
-    if (viewOnce) {
-      const mediaType = Object.keys(viewOnce)[0];
-      await sock.readMessages([msg.key]);
-      await sock.sendMessage(msg.key.remoteJid, { [mediaType]: viewOnce[mediaType] }, { quoted: msg });
-    }
+// Antilink in group
+if (isGroup && body.includes('https://chat.whatsapp.com/')) {
+  const groupMetadata = await sock.groupMetadata(from);
+  const isAdmin = groupMetadata.participants.find(p => p.id === sender)?.admin;
+  if (!isAdmin) {
+    await sock.sendMessage(from, { text: '🚫 WhatsApp group link is not allowed here.' }, { quoted: msg });
+    await sock.groupParticipantsUpdate(from, [sender], 'remove');
   }
 }
 
-startBot();
+// Commands
+if (body.startsWith(prefix)) {
+  const commandName = body.slice(prefix.length).trim().split(' ')[0].toLowerCase();
+  const args = body.slice(prefix.length + commandName.length).trim().split(/ +/);
+
+  // Fake presence recording
+  await sock.sendPresenceUpdate('recording', from);
+
+  // Execute command if exists
+  if (commands.has(commandName)) {
+    try {
+      await commands.get(commandName)(sock, msg, args, { from, sender, isGroup });
+    } catch (err) {
+      console.error(err);
+      await sock.sendMessage(from, { text: '❌ Error executing command.' }, { quoted: msg });
+    }
+  } else {
+    await sock.sendMessage(from, { text: `❓ Unknown command. Use ${prefix}menu to view available commands.` }, { quoted: msg });
+  }
+}
+
+}); };
+
+startSock();
+

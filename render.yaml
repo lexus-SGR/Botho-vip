@@ -1,32 +1,12 @@
 services:
   - type: web
-    name: api-service
+    name: fatuma-whatsapp-bot
     env: node
-    buildCommand: npm install
-    startCommand: node server.js
     plan: free
-    autoDeploy: false
+    buildCommand: npm install
+    startCommand: node index.mjs
     envVars:
+      - key: PORT
+        value: 3000
       - key: NODE_ENV
         value: production
-
-  - type: web
-    name: whatsapp-bot
-    env: node
-    buildCommand: npm install
-    startCommand: node index.js
-    plan: free
-    autoDeploy: false
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: BOT_OWNER
-        value: 255760317060
-      - key: PREFIX
-        value: 😁
-      - key: ANTI_LINK
-        value: on
-      - key: AUTO_VIEW_STATUS
-        value: on
-      - key: AUTO_OPEN_VIEWONCE
-        value: on

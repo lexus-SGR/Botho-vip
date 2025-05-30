@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import P from 'pino';
 import axios from 'axios';
-import cheerio from 'cheerio';
+import * as cheerio from 'cheerio';
 import { Boom } from '@hapi/boom';
 import qrcode from 'qrcode-terminal';
 import { fileURLToPath } from 'url';

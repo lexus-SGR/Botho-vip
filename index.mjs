@@ -13,52 +13,60 @@ import qrcode from 'qrcode-terminal';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import baileys from '@whiskeysockets/baileys';
+
 const {
   makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  makeInMemoryStore
+  makeCache
 } = baileys;
 
-// Needed for resolving __dirname in ES modules
+// __dirname fix for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Express server (for Render/UptimeRobot/etc.)
+// Express server
 const app = express();
 app.get('/', (req, res) => res.send('Fatuma WhatsApp Bot is running!'));
 app.listen(process.env.PORT || 3000, () =>
   console.log('Server running on port ' + (process.env.PORT || 3000))
 );
 
-// Bot configuration
+// Bot config
 const prefix = '😁';
 const ownerNumber = '255654478605@s.whatsapp.net';
 const botName = 'loveness-cybermqui';
 
-const store = makeInMemoryStore({ logger: P().child({ level: 'silent', stream: 'store' }) });
-store.readFromFile('./baileys_store.json');
-setInterval(() => store.writeToFile('./baileys_store.json'), 10000);
+// Create store with makeCache (in-memory, no file storage)
+const store = makeCache({ logger: P().child({ level: 'silent', stream: 'store' }) });
 
-// Load command files from /commands
+// Load commands - must be inside async function
 const commands = new Map();
-const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
-for (const file of commandFiles) {
-  const commandPath = path.resolve('./commands', file);
-  const command = await import(`file://${commandPath}`);
-  commands.set(command.default.name, command.default.execute);
+
+async function loadCommands() {
+  const commandFiles = fs.readdirSync(path.join(__dirname, 'commands')).filter(f => f.endsWith('.js'));
+  for (const file of commandFiles) {
+    const commandPath = path.join(__dirname, 'commands', file);
+    const command = await import(`file://${commandPath}`);
+    commands.set(command.default.name, command.default.execute);
+  }
 }
 
 const startSock = async () => {
-  const { state, saveCreds } = await useMultiFileAuthState('./auth');
+  await loadCommands();
+
+  const { state, saveCreds } = await useMultiFileAuthState(path.join(__dirname, 'auth'));
   const { version } = await fetchLatestBaileysVersion();
+
   const sock = makeWASocket({
     version,
     auth: state,
     printQRInTerminal: true,
     logger: P({ level: 'silent' }),
-    browser: [botName, 'Safari', '1.0']
+    browser: [botName, 'Safari', '1.0'],
+    // pass store
+    store
   });
 
   store.bind(sock.ev);
@@ -67,7 +75,8 @@ const startSock = async () => {
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect } = update;
     if (connection === 'close') {
-      const shouldReconnect = (lastDisconnect.error = new Boom(lastDisconnect?.error))?.output?.statusCode !== DisconnectReason.loggedOut;
+      const err = new Boom(lastDisconnect?.error);
+      const shouldReconnect = err.output?.statusCode !== DisconnectReason.loggedOut;
       if (shouldReconnect) startSock();
       else console.log('🔴 Connection closed. You are logged out.');
     } else if (connection === 'open') {

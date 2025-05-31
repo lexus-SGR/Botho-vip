@@ -1,26 +1,32 @@
-const fetch = require("node-fetch");
+const axios = require("axios");
 
 module.exports = {
   name: "simi",
   description: "Chat with Simi AI 🤖",
-  usage: "simi <your message>",
+  usage: "simi Hello there!",
   category: "ai",
-  react: "🤖",
+  react: "💬",
   sudo: false,
-  async execute(sock, msg, args, from, sender) {
-    const text = args.join(" ");
-    if (!text) {
-      return sock.sendMessage(from, { text: "💬 Please provide a message to talk to Simi: `.simi hello`" }, { quoted: msg });
+  async execute(sock, msg, args, from, sender, isGroup) {
+    if (!args[0]) {
+      return sock.sendMessage(from, { text: "💡 Please type something to chat with Simi.\n\nExample: `!simi hello`" }, { quoted: msg });
     }
 
-    try {
-      const res = await fetch(`https://api.simsimi.net/v2/?text=${encodeURIComponent(text)}&lc=en`);
-      const data = await res.json();
-      const reply = data.success || "🤖 Sorry, I didn't understand that.";
+    const apiKey = process.env.SIMI_API_KEY;
+    if (!apiKey) {
+      return sock.sendMessage(from, { text: "⚠️ Simi API key not set in environment variables." }, { quoted: msg });
+    }
 
-      await sock.sendMessage(from, { text: `🗣️ ${reply}` }, { quoted: msg });
+    const query = args.join(" ");
+    try {
+      const { data } = await axios.get(`https://api.simsimi.net/v2/?text=${encodeURIComponent(query)}&lc=en&key=${apiKey}`);
+      if (data.success) {
+        await sock.sendMessage(from, { text: `🤖 ${data.success}` }, { quoted: msg });
+      } else {
+        await sock.sendMessage(from, { text: "❌ Sorry, I didn't understand that." }, { quoted: msg });
+      }
     } catch (err) {
-      await sock.sendMessage(from, { text: "⚠️ Failed to connect to Simi API." }, { quoted: msg });
+      await sock.sendMessage(from, { text: "⚠️ Error connecting to Simi API." }, { quoted: msg });
     }
   }
 };

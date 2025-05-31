@@ -7,7 +7,7 @@ const P = require("pino");
 const path = require("path");
 
 const nsfwBlockCmd = require('./commands/nsfwblock');
-const nsfwScan = require('./handlers/nsfwHandler');
+//const nsfwScan = require('./handlers/nsfwHandler');
 const { warnUser } = require('./handlers/warnUser');
 
 const {
@@ -180,7 +180,7 @@ async function startBot() {
       }
 
       // NSFW scan for all messages except commands
-      await nsfwScan(sock, msg);
+     // await nsfwScan(sock, msg);
 
       if (AUTO_TYPING) await sock.sendPresenceUpdate("composing", from);
       if (RECORD_VOICE_FAKE) await sock.sendPresenceUpdate("recording", from);

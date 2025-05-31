@@ -2,7 +2,7 @@
   "name": "botho-vip",
   "version": "1.0.0",
   "description": "Pair code generator and WhatsApp bot with multi services",
-  "main": "server.js",
+  "main": "node index.js",
   "scripts": {
     "start-server": "node server.js",
     "start-bot": "node index.js",
@@ -20,7 +20,7 @@
     "got": "^12.6.0",
     "mime-types": "^2.1.35",
     "moment": "^2.29.4",
-    "node-fetch": "^2.6.7",                 // 👈 HII NDIYO TUMEONGEZA
+    "node-fetch": "^2.6.7",                 
     "pino": "^8.0.0",
     "qrcode": "^1.5.1",
     "qrcode-terminal": "^0.12.0",

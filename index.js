@@ -1,12 +1,12 @@
 require('events').EventEmitter.defaultMaxListeners = 100;
 require("dotenv").config();
 const express = require("express");
-const welcomeGroups = new Set();
 const fs = require("fs");
-const fetch = require('node-fetch');
 const path = require("path");
-const P = require("pino");
+const fetch = require('node-fetch');
 const qrcode = require("qrcode-terminal");
+const P = require("pino");
+
 const {
   makeWASocket,
   useMultiFileAuthState,
@@ -21,17 +21,20 @@ app.listen(process.env.PORT || 3000, () =>
   console.log("Server running on port " + (process.env.PORT || 3000))
 );
 
-// Env Configs
+// ========= ENV CONFIG ===========
 const OWNER_NUMBER = "255654478605";
 const OWNER_JID = OWNER_NUMBER + "@s.whatsapp.net";
 const PREFIX = "😁";
-const AUTO_BIO = true;                                                                                                                                                           const AUTO_VIEW_ONCE = process.env.AUTO_VIEW_ONCE === "on";
+
+const AUTO_BIO = true;
+const AUTO_VIEW_ONCE = process.env.AUTO_VIEW_ONCE === "on";
 const ANTILINK_ENABLED = process.env.ANTILINK === "on";
 const AUTO_TYPING = process.env.AUTO_TYPING === "on";
 const RECORD_VOICE_FAKE = process.env.RECORD_VOICE_FAKE === "on";
 const AUTO_VIEW_STATUS = process.env.AUTO_VIEW_STATUS === "on";
 const AUTO_REACT_EMOJI = process.env.AUTO_REACT_EMOJI || "";
 
+// ========= DATA STORAGE ===========
 let antiLinkGroups = {};
 try {
   antiLinkGroups = JSON.parse(fs.readFileSync('./antilink.json'));
@@ -39,7 +42,10 @@ try {
   fs.writeFileSync('./antilink.json', '{}');
 }
 
-(async () => {
+const welcomeGroups = new Set();
+
+// ========= BOT START ===========
+async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("./auth");
   const { version } = await fetchLatestBaileysVersion();
 
@@ -52,16 +58,17 @@ try {
     logger: P({ level: "silent" })
   });
 
-
   sock.ev.on("creds.update", saveCreds);
 
   sock.ev.on("connection.update", async ({ connection, qr, lastDisconnect }) => {
     if (qr) qrcode.generate(qr, { small: true });
+
     if (connection === "close") {
       const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
       if (shouldReconnect) startBot();
     } else if (connection === "open") {
       console.log("✅ Bot connected!");
+
       const welcomeText = `
 🔰 *WELCOME TO love cyber WHATSAPP BOT* 🔰
 ✅ *Bot Connected Successfully!*
@@ -80,7 +87,6 @@ try {
           "Entertainment is the spark of learning!"
         ];
 
-      
         const newBio = `👑 cyber loven | 👤 herieth | 📅 ${dateStr} | ✨ ${quotes[Math.floor(Math.random() * quotes.length)]}`;
         try {
           await sock.updateProfileStatus(newBio);
@@ -91,6 +97,7 @@ try {
     }
   });
 
+  // WELCOME GROUPS
   sock.ev.on('group-participants.update', async (update) => {
     const groupId = update.id;
     if (welcomeGroups.has(groupId)) {
@@ -112,6 +119,7 @@ try {
     }
   });
 
+  // LOAD COMMANDS
   const commands = new Map();
   const commandsPath = path.join(__dirname, "commands");
   if (!fs.existsSync(commandsPath)) fs.mkdirSync(commandsPath);
@@ -121,6 +129,7 @@ try {
     if (cmd.name) commands.set(cmd.name.toLowerCase(), cmd);
   });
 
+  // ON MESSAGE
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
     if (!msg.message) return;
@@ -128,6 +137,7 @@ try {
     const from = msg.key.remoteJid;
     const isGroup = from.endsWith("@g.us");
     const sender = msg.key.participant || msg.key.remoteJid;
+
     const body = msg.message?.conversation ||
       msg.message?.extendedTextMessage?.text ||
       msg.message?.imageMessage?.caption || "";
@@ -150,7 +160,8 @@ try {
     let groupMetadata = {}, isAdmin = false, botIsAdmin = false;
     if (isGroup) {
       groupMetadata = await sock.groupMetadata(from);
-      isAdmin = groupMetadata.participants.find(p => p.id === sender)?.admin != null;                                                                                                  const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
+      isAdmin = groupMetadata.participants.find(p => p.id === sender)?.admin != null;
+      const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
       botIsAdmin = groupMetadata.participants.find(p => p.id === botJid)?.admin != null;
     }
 
@@ -163,7 +174,7 @@ try {
     }
 
     if (AUTO_VIEW_ONCE) {
-      await handleViewOnceMessage(msg);
+      await handleViewOnceMessage(msg, sock);
     }
 
     if (ANTILINK_ENABLED && isGroup && antiLinkGroups[from]?.enabled) {
@@ -177,7 +188,8 @@ try {
             });
             await new Promise(resolve => setTimeout(resolve, 5000));
             await sock.groupParticipantsUpdate(from, [sender], "remove");
-            await sock.sendMessage(from, {                                                                                                                                                     text: `✅ @${sender.split("@")[0]} has been removed for sharing a forbidden link.`,
+            await sock.sendMessage(from, {
+              text: `✅ @${sender.split("@")[0]} has been removed for sharing a forbidden link.`,
               mentions: [sender]
             });
           } catch (e) {
@@ -187,6 +199,7 @@ try {
       }
     }
 
+    // ANTI-LINK COMMAND
     if (body.startsWith(`${PREFIX}antilink`) && isAdmin) {
       const option = args[0]?.toLowerCase();
       if (option === "on") {
@@ -204,6 +217,7 @@ try {
       return;
     }
 
+    // WELCOME TOGGLE
     if (body === `${PREFIX}welcome`) {
       if (!isGroup) {
         await sock.sendMessage(from, { text: "❌ This command is for groups only." }, { quoted: msg });
@@ -219,30 +233,30 @@ try {
         await sock.sendMessage(from, { text: "👋 Welcome messages have been *disabled*." }, { quoted: msg });
       } else {
         welcomeGroups.add(from);
-        await sock.sendMessage(from, { text: "✅ Welcome messages have been *enabled*. New members will now get a welcome message." }, { quoted: msg });
+        await sock.sendMessage(from, { text: "✅ Welcome messages have been *enabled*." }, { quoted: msg });
       }
       return;
     }
   });
+}
 
-            
-  async function handleViewOnceMessage(msg) {
-    const viewOnce = msg.message?.viewOnceMessage;
-    if (!viewOnce) return;
+// VIEW ONCE HANDLER
+async function handleViewOnceMessage(msg, sock) {
+  const viewOnce = msg.message?.viewOnceMessage;
+  if (!viewOnce) return;
 
-    try {
-      const viewOnceContent = viewOnce.message;
-      if (!viewOnceContent) return;
-      const from = msg.key.remoteJid;
-      await sock.sendMessage(from, {
-        ...viewOnceContent,
-        viewOnce: true
-      });
-    } catch (error) {
-      console.error("❌ Error handling view once message:", error);
-    }
+  try {
+    const viewOnceContent = viewOnce.message;
+    if (!viewOnceContent) return;
+    const from = msg.key.remoteJid;
+    await sock.sendMessage(from, {
+      ...viewOnceContent,
+      viewOnce: true
+    });
+  } catch (error) {
+    console.error("❌ Error handling view once message:", error);
   }
 }
 
+// Start the bot
 startBot().catch(err => console.error("Bot start error:", err));
- 

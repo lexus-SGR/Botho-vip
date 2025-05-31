@@ -1,40 +1,33 @@
 const axios = require("axios");
 
 module.exports = {
-  name: "pdfurl",
-  description: "Convert a webpage URL to PDF",
-  usage: "pdfurl <webpage URL>",
+  name: "extractpdf",
+  description: "Extract text from PDF URL",
+  usage: "extractpdf <pdf_url>",
   category: "tools",
   react: "📄",
   sudo: false,
   async execute(sock, msg, args, from, sender) {
-    if (!args.length) {
-      return sock.sendMessage(from, { text: "❌ Please provide a webpage URL." }, { quoted: msg });
-    }
+    if (!args.length) return sock.sendMessage(from, { text: "❌ Please provide a PDF URL." }, { quoted: msg });
 
-    const url = args[0];
+    const pdfUrl = args[0];
     try {
-      await sock.sendMessage(from, { react: { text: "📄", key: msg.key }});
+      await sock.sendMessage(from, { react: { text: "📄", key: msg.key } });
 
-      const response = await axios.get(`https://api.pdf.co/v1/pdf/convert/from/url?name=webpage.pdf&url=${encodeURIComponent(url)}`, {
-        headers: { "x-api-key": process.env.PDF_API_KEY }
+      const res = await axios.post("https://api.pdftools.example/extract", {
+        api_key: process.env.PDF_API_KEY,
+        url: pdfUrl
       });
 
-      if (!response.data || !response.data.url) {
-        return sock.sendMessage(from, { text: "❌ Failed to convert URL to PDF." }, { quoted: msg });
-      }
+      if (!res.data.text) return sock.sendMessage(from, { text: "❌ Could not extract text." }, { quoted: msg });
 
-      const pdfUrl = response.data.url;
-      await sock.sendMessage(from, {
-        document: { url: pdfUrl },
-        mimetype: "application/pdf",
-        fileName: "webpage.pdf",
-        caption: `📄 PDF generated from ${url}`
-      }, { quoted: msg });
+      const text = res.data.text.length > 1000 ? res.data.text.slice(0, 1000) + "..." : res.data.text;
+
+      await sock.sendMessage(from, { text: `📄 Extracted PDF Text:\n\n${text}` }, { quoted: msg });
 
     } catch (error) {
       console.error(error);
-      await sock.sendMessage(from, { text: "⚠️ Error converting URL to PDF." }, { quoted: msg });
+      await sock.sendMessage(from, { text: "⚠️ PDF extraction failed." }, { quoted: msg });
     }
   }
 };

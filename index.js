@@ -155,6 +155,21 @@ async function startBot() {
 
     const args = body.trim().split(/\s+/).slice(1);
     const command = commands.get(commandName);
+      if (command === 'nsfwblock') {
+        await nsfwBlockCmd.execute(sock, msg, args, from, sender, isGroup);
+        return; // komandi imekamilika, usisubiri ku-scan nsfw
+      }
+
+      // ... comm
+    }
+
+    // Skan messages zote zisizo command kwa NSFW
+    await nsfwScan(sock, msg);
+
+  } catch (err) {
+    console.error("Message handler error:", err);
+  }
+});
 
     if (AUTO_TYPING) await sock.sendPresenceUpdate('composing', from);
     if (RECORD_VOICE_FAKE) await sock.sendPresenceUpdate('recording', from);

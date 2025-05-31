@@ -8,7 +8,7 @@ const path = require("path");
 
 const nsfwBlockCmd = require('./commands/nsfwblock');
 //const nsfwScan = require('./handlers/nsfwHandler');
-const { warnUser } = require('./handlers/warnUser');
+//const { warnUser } = require('./handlers/warnUser');
 
 const {
   makeWASocket,

@@ -38,11 +38,28 @@ let antiLinkGroups = {};
 try {
   antiLinkGroups = JSON.parse(fs.readFileSync('./antilink.json'));
 } catch {
-  fs.writeFileSync('./antilink.json', '{}');
+  antiLinkGroups = {};
+  fs.writeFileSync('./antilink.json', JSON.stringify(antiLinkGroups, null, 2));
 }
-
 const welcomeGroups = new Set();
 const commands = new Map();
+// ==== LOAD COMMANDS FROM ./commands ====
+const commandsDir = path.join(__dirname, "commands");
+
+if (fs.existsSync(commandsDir)) {
+  const files = fs.readdirSync(commandsDir).filter(file => file.endsWith(".js"));
+  for (const file of files) {
+    try {
+      const command = require(path.join(commandsDir, file));
+      if (command.name && typeof command.execute === "function") {
+        commands.set(command.name, command);
+        console.log(`✅ Loaded command: ${command.name}`);
+      }
+    } catch (err) {
+      console.error(`❌ Error loading ${file}:`, err);
+    }
+  }
+}
 
 // ==== MFANO WA COMMAND NDANI YA FILE HII ====
 commands.set("menu", {
@@ -50,7 +67,7 @@ commands.set("menu", {
   description: "Show all commands",
   async execute(sock, msg, args, from, sender, isGroup) {
     const text = `
-✨ *Fatuma WhatsApp Bot Menu* ✨
+✨ *loveness-cyber WhatsApp Bot Menu* ✨
 
 ${[...commands.keys()].map(cmd => `🔹 ${PREFIX}${cmd}`).join("\n")}
 
@@ -86,7 +103,7 @@ async function startBot() {
       console.log("✅ Bot connected!");
 
       await sock.sendMessage(OWNER_JID, {
-        text: `✅ Fatuma Bot Connected!\nType ${PREFIX}menu for commands.`,
+        text: `✅ loveness-cyber Bot Connected!\nType ${PREFIX}menu for commands.`,
         mentions: [OWNER_JID]
       });
 
@@ -156,26 +173,39 @@ async function startBot() {
     }
 
     if (ANTILINK_ENABLED && isGroup && antiLinkGroups[from]?.enabled) {
-      if (body.includes("https://chat.whatsapp.com")) {
-        const groupMetadata = await sock.groupMetadata(from);
-        const isAdmin = groupMetadata.participants.find(p => p.id === sender)?.admin != null;
-        const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
-        const botIsAdmin = groupMetadata.participants.find(p => p.id === botJid)?.admin != null;
+  if (body.includes("https://chat.whatsapp.com")) {
+    const groupMetadata = await sock.groupMetadata(from);
+    const isAdmin = groupMetadata.participants.find(p => p.id === sender)?.admin != null;
+    const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
+    const botIsAdmin = groupMetadata.participants.find(p => p.id === botJid)?.admin != null;
 
-        if (!isAdmin && botIsAdmin) {
-          try {
-            await sock.sendMessage(from, { delete: msg.key });
-            await sock.sendMessage(from, {
-              text: `⚠️ @${sender.split("@")[0]}, you shared a group link. You will be removed.`,
-              mentions: [sender]
-            });
-            await sock.groupParticipantsUpdate(from, [sender], "remove");
-          } catch (e) {
-            console.error("❌ Antilink error:", e);
-          }
-        }
+    if (!isAdmin && botIsAdmin) {
+      // Initialize warnings
+      antiLinkGroups[from].warns = antiLinkGroups[from].warns || {};
+      antiLinkGroups[from].warns[sender] = (antiLinkGroups[from].warns[sender] || 0) + 1;
+      const warns = antiLinkGroups[from].warns[sender];
+
+      // Save to file
+      fs.writeFileSync('./antilink.json', JSON.stringify(antiLinkGroups, null, 2));
+
+      if (warns >= 3) {
+        // Remove user after 3 warnings
+        await sock.sendMessage(from, {
+          text: `🚫 @${sender.split("@")[0]} you have sent a group link ${warns} times. You will be removed.`,
+          mentions: [sender]
+        });
+        await sock.groupParticipantsUpdate(from, [sender], "remove");
+        delete antiLinkGroups[from].warns[sender];
+      } else {
+        // Warning message
+        await sock.sendMessage(from, {
+          text: `⚠️ @${sender.split("@")[0]} do not share group links! This is warning ${warns}/3.`,
+          mentions: [sender]
+        });
       }
     }
+  }
+}
 
     // Toggle welcome
     if (body === `${PREFIX}welcome`) {

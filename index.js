@@ -5,8 +5,6 @@ const fs = require("fs");
 const qrcode = require("qrcode-terminal");
 const P = require("pino");
 const path = require("path");
-const scraper = require('@bochilteam/scraper');
-const twitterGetUrl = require("twitter-url-direct");
 
 
 

@@ -21,6 +21,7 @@
     "got": "^12.6.0",
     "mime-types": "^2.1.35",
     "moment": "^2.29.4",
+    "twitter-url-direct": "^1.0.6",
     "node-fetch": "^2.6.7",
     "pino": "^8.0.0",
     "qrcode": "^1.5.1",

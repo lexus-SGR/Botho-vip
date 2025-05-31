@@ -6,7 +6,7 @@ const qrcode = require("qrcode-terminal");
 const P = require("pino");
 const path = require("path");
 
-const nsfwBlockCmd = require('./commands/nsfwblock');
+//const nsfwBlockCmd = require('./commands/nsfwblock');
 // const nsfwScan = require('./handlers/nsfwHandler');
 
 const {
@@ -47,6 +47,33 @@ try {
 const welcomeGroups = new Set();
 const commands = new Map();
 
+
+// NSFW Block Command
+const nsfwBlockCmd = {
+  name: "nsfwblock",
+  description: "Enable or disable NSFW blocker",
+  async execute(sock, msg, args, from, sender, isGroup) {
+    if (!isGroup) return await sock.sendMessage(from, { text: "This command works only in groups." });
+    if (!args.length) return await sock.sendMessage(from, { text: `Usage: ${PREFIX}nsfwblock on/off` });
+    const arg = args[0].toLowerCase();
+    if (arg !== "on" && arg !== "off") {
+      return await sock.sendMessage(from, { text: `Invalid option. Use 'on' or 'off'.` });
+    }
+    let nsfwSettings = {};
+    try {
+      nsfwSettings = JSON.parse(fs.readFileSync('./nsfwsettings.json', 'utf8'));
+    } catch {
+      nsfwSettings = {};
+    }
+    nsfwSettings[from] = arg === "on";
+    fs.writeFileSync('./nsfwsettings.json', JSON.stringify(nsfwSettings, null, 2));
+    await sock.sendMessage(from, { text: `NSFW blocker is now *${arg.toUpperCase()}* for this group.` });
+  },
+};
+
+commands.set("nsfwblock", nsfwBlockCmd);
+
+// Menu Command
 // ==== LOAD COMMANDS ====
 const commandsDir = path.join(__dirname, "commands");
 if (fs.existsSync(commandsDir)) {

@@ -27,10 +27,7 @@
     "querystring": "^0.2.1",
     "yt-search": "^2.10.6",
     "ytdl-core": "^4.11.0",
-    "tiktok-scraper": "^1.4.35",
-    "googleapis": "^121.0.0",
-    "google-auth-library": "^8.10.0",
-    "twurl": "^1.1.1"
+    "tiktok-scraper": "^1.4.35"
   },
   "repository": {
     "type": "git",

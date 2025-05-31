@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const welcomeGroups = new Set();
 const fs = require("fs");
+const fetch = require('node-fetch');
 const path = require("path");
 const P = require("pino");
 const qrcode = require("qrcode-terminal");
@@ -38,7 +39,7 @@ try {
   fs.writeFileSync('./antilink.json', '{}');
 }
 
-async function startBot() {
+(async () => {
   const { state, saveCreds } = await useMultiFileAuthState("./auth");
   const { version } = await fetchLatestBaileysVersion();
 
@@ -50,6 +51,7 @@ async function startBot() {
     },
     logger: P({ level: "silent" })
   });
+
 
   sock.ev.on("creds.update", saveCreds);
 

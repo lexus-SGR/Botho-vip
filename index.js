@@ -1,15 +1,10 @@
 require('events').EventEmitter.defaultMaxListeners = 100;
 require("dotenv").config();
-const express = require("express");
 const fs = require("fs");
+const path = require("path");
 const qrcode = require("qrcode-terminal");
 const P = require("pino");
-const path = require("path");
-
-
-
-//const nsfwBlockCmd = require('./commands/nsfwblock');
-// const nsfwScan = require('./handlers/nsfwHandler');
+const express = require("express");
 
 const {
   makeWASocket,
@@ -19,13 +14,7 @@ const {
   makeCacheableSignalKeyStore
 } = require("@whiskeysockets/baileys");
 
-const app = express();
-app.get("/", (req, res) => res.send("Fatuma WhatsApp Bot is running!"));
-app.listen(process.env.PORT || 3000, () =>
-  console.log("Server running on port " + (process.env.PORT || 3000))
-);
-
-// ==== SETTINGS ====
+// SETTINGS
 const OWNER_NUMBER = "255654478605";
 const OWNER_JID = OWNER_NUMBER + "@s.whatsapp.net";
 const PREFIX = "😁";
@@ -35,71 +24,64 @@ const AUTO_VIEW_ONCE = process.env.AUTO_VIEW_ONCE === "on";
 const ANTILINK_ENABLED = process.env.ANTILINK === "on";
 const AUTO_TYPING = process.env.AUTO_TYPING === "on";
 const RECORD_VOICE_FAKE = process.env.RECORD_VOICE_FAKE === "on";
-const AUTO_VIEW_STATUS = process.env.AUTO_VIEW_STATUS === "on";
 const AUTO_REACT_EMOJI = process.env.AUTO_REACT_EMOJI || "";
 
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+let lastQRCode = null;
+
+// JSON file paths
+const antiLinkFile = path.join(__dirname, 'antilink.json');
+const nsfwSettingsFile = path.join(__dirname, 'nsfwsettings.json');
+
+// Load or initialize JSON data
 let antiLinkGroups = {};
 try {
-  antiLinkGroups = JSON.parse(fs.readFileSync('./antilink.json', 'utf-8'));
+  antiLinkGroups = JSON.parse(fs.readFileSync(antiLinkFile, 'utf-8'));
 } catch {
   antiLinkGroups = {};
-  fs.writeFileSync('./antilink.json', JSON.stringify(antiLinkGroups, null, 2));
+  fs.writeFileSync(antiLinkFile, JSON.stringify(antiLinkGroups, null, 2));
 }
 
+let nsfwSettings = {};
+try {
+  nsfwSettings = JSON.parse(fs.readFileSync(nsfwSettingsFile, 'utf-8'));
+} catch {
+  nsfwSettings = {};
+  fs.writeFileSync(nsfwSettingsFile, JSON.stringify(nsfwSettings, null, 2));
+}
+
+// Welcome toggle groups
 const welcomeGroups = new Set();
+
+// COMMANDS Map
 const commands = new Map();
 
-
-// NSFW Block Command
-const nsfwBlockCmd = {
+// Command: NSFW Block on/off
+commands.set("nsfwblock", {
   name: "nsfwblock",
-  description: "Enable or disable NSFW blocker",
+  description: "Enable or disable NSFW blocker in group",
   async execute(sock, msg, args, from, sender, isGroup) {
     if (!isGroup) return await sock.sendMessage(from, { text: "This command works only in groups." });
     if (!args.length) return await sock.sendMessage(from, { text: `Usage: ${PREFIX}nsfwblock on/off` });
     const arg = args[0].toLowerCase();
     if (arg !== "on" && arg !== "off") {
-      return await sock.sendMessage(from, { text: `Invalid option. Use 'on' or 'off'.` });
-    }
-    let nsfwSettings = {};
-    try {
-      nsfwSettings = JSON.parse(fs.readFileSync('./nsfwsettings.json', 'utf8'));
-    } catch {
-      nsfwSettings = {};
+      return await sock.sendMessage(from, { text: `Please use 'on' or 'off'.` });
     }
     nsfwSettings[from] = arg === "on";
-    fs.writeFileSync('./nsfwsettings.json', JSON.stringify(nsfwSettings, null, 2));
-    await sock.sendMessage(from, { text: `NSFW blocker is now *${arg.toUpperCase()}* for this group.` });
-  },
-};
-
-commands.set("nsfwblock", nsfwBlockCmd);
-
-// Menu Command
-// ==== LOAD COMMANDS ====
-const commandsDir = path.join(__dirname, "commands");
-if (fs.existsSync(commandsDir)) {
-  const files = fs.readdirSync(commandsDir).filter(file => file.endsWith(".js"));
-  for (const file of files) {
-    try {
-      const command = require(path.join(commandsDir, file));
-      if (command.name && typeof command.execute === "function") {
-        commands.set(command.name.toLowerCase(), command);
-        console.log(`✅ Loaded command: ${command.name}`);
-      }
-    } catch (err) {
-      console.error(`❌ Error loading ${file}:`, err);
-    }
+    fs.writeFileSync(nsfwSettingsFile, JSON.stringify(nsfwSettings, null, 2));
+    await sock.sendMessage(from, { text: `NSFW blocker is now *${arg.toUpperCase()}* in this group.` });
   }
-}
+});
 
-// ==== ADD MENU COMMAND ====
+// Command: Menu
 commands.set("menu", {
   name: "menu",
-  description: "Show all commands",
+  description: "Show commands list",
   async execute(sock, msg, args, from, sender, isGroup) {
     const text = `
-✨ *loveness-cyber WhatsApp Bot Menu* ✨
+🤖 *lovenness-cyber WhatsApp Bot Menu* 🤖
 
 ${[...commands.keys()].map(cmd => `🔹 ${PREFIX}${cmd}`).join("\n")}
 
@@ -109,7 +91,7 @@ ${[...commands.keys()].map(cmd => `🔹 ${PREFIX}${cmd}`).join("\n")}
   }
 });
 
-// ==== HANDLE VIEW ONCE ====
+// Handle view once message to auto download & resend
 async function handleViewOnceMessage(msg, sock) {
   const viewOnceMsg = msg.message?.viewOnceMessageV2Extension?.message;
   if (viewOnceMsg) {
@@ -121,7 +103,6 @@ async function handleViewOnceMessage(msg, sock) {
   }
 }
 
-// ==== START BOT ====
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("./auth");
   const { version } = await fetchLatestBaileysVersion();
@@ -140,7 +121,11 @@ async function startBot() {
   sock.ev.on("connection.update", async (update) => {
     const { connection, qr, lastDisconnect } = update;
 
-    if (qr) qrcode.generate(qr, { small: true });
+    if (qr) {
+      lastQRCode = qr;
+      qrcode.generate(qr, { small: true });
+      console.log("Scan QR code above to login");
+    }
 
     if (connection === "close") {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
@@ -149,7 +134,7 @@ async function startBot() {
         console.log("🔁 Reconnecting...");
         startBot();
       } else {
-        console.log("❌ Logged out. Delete auth folder and rescan QR.");
+        console.log("❌ Logged out. Delete auth folder and scan QR again.");
       }
     }
 
@@ -157,12 +142,12 @@ async function startBot() {
       console.log("✅ Bot connected!");
 
       await sock.sendMessage(OWNER_JID, {
-        text: `✅ loveness-cyber Bot Connected!\nType ${PREFIX}menu for commands.`,
+        text: `✅ lovenness-cyber Bot Connected!\nType ${PREFIX}menu for commands.`,
         mentions: [OWNER_JID],
       });
 
       if (AUTO_BIO) {
-        const bio = `👑 cyber loven | 👤 herieth | 📅 ${new Date().toLocaleDateString("en-GB")}`;
+        const bio = `👑 cyber loven | 📅 ${new Date().toLocaleDateString("en-GB")}`;
         try {
           await sock.updateProfileStatus(bio);
         } catch (e) {
@@ -179,7 +164,7 @@ async function startBot() {
     for (const participant of update.participants) {
       if (update.action === "add") {
         const meta = await sock.groupMetadata(groupId);
-        const text = `👋 Karibu @${participant.split("@")[0]} kwenye *${meta.subject}*!`;
+        const text = `👋 Welcome @${participant.split("@")[0]} to *${meta.subject}*!`;
         await sock.sendMessage(groupId, { text, mentions: [participant] });
       }
     }
@@ -200,17 +185,25 @@ async function startBot() {
         msg.message.imageMessage?.caption ||
         "";
 
-      const commandName = body.startsWith(PREFIX)
-        ? body.slice(PREFIX.length).split(/\s+/)[0].toLowerCase()
-        : null;
+      // Anti-link check
+      if (
+        ANTILINK_ENABLED &&
+        isGroup &&
+        antiLinkGroups[from]?.enabled &&
+        body.includes("https://chat.whatsapp.com")
+      ) {
+        await sock.groupRemove(from, [sender]);
+        await sock.sendMessage(from, { text: "❌ Joining group links are not allowed here." });
+        return;
+      }
 
+      if (!body.startsWith(PREFIX)) return;
+
+      const commandName = body.slice(PREFIX.length).split(/\s+/)[0].toLowerCase();
       const args = body.trim().split(/\s+/).slice(1);
       const command = commands.get(commandName);
 
-      if (commandName === "nsfwblock") {
-        await nsfwBlockCmd.execute(sock, msg, args, from, sender, isGroup);
-        return;
-      }
+      if (!command) return;
 
       if (AUTO_TYPING) await sock.sendPresenceUpdate("composing", from);
       if (RECORD_VOICE_FAKE) await sock.sendPresenceUpdate("recording", from);
@@ -222,78 +215,19 @@ async function startBot() {
 
       if (AUTO_VIEW_ONCE) await handleViewOnceMessage(msg, sock);
 
-      if (command) {
-        try {
-          await command.execute(sock, msg, args, from, sender, isGroup);
-        } catch (err) {
-          console.error("❌ Command error:", err);
-          await sock.sendMessage(from, { text: `❌ Error executing command: ${commandName}` });
-        }
-      }
+      await command.execute(sock, msg, args, from, sender, isGroup);
 
-      // === Welcome Toggle ===
-      if (body === `${PREFIX}welcome`) {
-        if (!isGroup) return;
+      // Welcome toggle command inside messages.upsert
+      if (commandName === "welcome" && isGroup) {
         const meta = await sock.groupMetadata(from);
-        const isAdmin = meta.participants.find((p) => p.id === sender)?.admin != null;
+        const isAdmin = meta.participants.find(p => p.id === sender)?.admin != null;
         if (!isAdmin) return;
-
         if (welcomeGroups.has(from)) {
           welcomeGroups.delete(from);
-          await sock.sendMessage(from, { text: "👋 Welcome message disabled." });
+          await sock.sendMessage(from, { text: "👋 Welcome message turned off." });
         } else {
           welcomeGroups.add(from);
-          await sock.sendMessage(from, { text: "✅ Welcome message enabled." });
-        }
-      }
-
-      // === Antilink ===
-      if (ANTILINK_ENABLED && isGroup && antiLinkGroups[from]?.enabled) {
-        if (body.includes("https://chat.whatsapp.com")) {
-          const groupMetadata = await sock.groupMetadata(from);
-          const isAdmin = groupMetadata.participants.find((p) => p.id === sender)?.admin != null;
-          const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
-          const botIsAdmin = groupMetadata.participants.find((p) => p.id === botJid)?.admin != null;
-
-          if (!isAdmin && botIsAdmin) {
-            antiLinkGroups[from].warns = antiLinkGroups[from].warns || {};
-            antiLinkGroups[from].warns[sender] = (antiLinkGroups[from].warns[sender] || 0) + 1;
-            const warns = antiLinkGroups[from].warns[sender];
-            fs.writeFileSync("./antilink.json", JSON.stringify(antiLinkGroups, null, 2));
-
-            if (warns >= 3) {
-              await sock.sendMessage(from, {
-                text: `🚫 @${sender.split("@")[0]} umetoa link ${warns}x. Utaondolewa.`,
-                mentions: [sender],
-              });
-              await sock.groupParticipantsUpdate(from, [sender], "remove");
-              delete antiLinkGroups[from].warns[sender];
-            } else {
-              await sock.sendMessage(from, {
-                text: `⚠️ @${sender.split("@")[0]} usishiriki link za group! Warning ${warns}/3.`,
-                mentions: [sender],
-              });
-            }
-          }
-        }
-      }
-
-      // === Antilink Toggle ===
-      if (body.startsWith(`${PREFIX}antilink`)) {
-        if (!isGroup) return;
-        const meta = await sock.groupMetadata(from);
-        const isAdmin = meta.participants.find((p) => p.id === sender)?.admin != null;
-        if (!isAdmin) return;
-
-        const option = args[0]?.toLowerCase();
-        if (option === "on") {
-          antiLinkGroups[from] = { enabled: true };
-          fs.writeFileSync("./antilink.json", JSON.stringify(antiLinkGroups, null, 2));
-          await sock.sendMessage(from, { text: "✅ Antilink enabled." });
-        } else if (option === "off") {
-          delete antiLinkGroups[from];
-          fs.writeFileSync("./antilink.json", JSON.stringify(antiLinkGroups, null, 2));
-          await sock.sendMessage(from, { text: "❎ Antilink disabled." });
+          await sock.sendMessage(from, { text: "✅ Welcome message turned on." });
         }
       }
 
@@ -301,6 +235,27 @@ async function startBot() {
       console.error("❌ Message handler error:", err);
     }
   });
+
+  console.log("🤖 Bot is ready!");
 }
 
+// Express routes
+app.get("/", (req, res) => {
+  res.send("lovenness-cyber WhatsApp bot running!");
+});
+
+app.get("/qr", (req, res) => {
+  if (!lastQRCode) return res.send("QR code not generated yet.");
+  qrcode.toString(lastQRCode, { type: "terminal" }, (err, qrStr) => {
+    if (err) return res.status(500).send("Failed to generate QR code.");
+    res.type("text/plain").send(qrStr);
+  });
+});
+
+// Start express server
+app.listen(PORT, () => {
+  console.log(`🌐 Express server running on http://localhost:${PORT}`);
+});
+
+// Start WhatsApp bot
 startBot();

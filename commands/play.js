@@ -7,8 +7,11 @@ module.exports = {
   category: "media",
   usage: "play <song name>",
   react: "🎵",
-  sudo: false, // set to true if you want only owner to use
+  sudo: false,
   async execute(sock, msg, args, from, sender) {
+    // Hapa ni code yako yote ulivyoandika...
+    await sock.sendMessage(from, { react: { text: "🎵", key: msg.key }});
+
     if (!args.length) {
       return sock.sendMessage(from, { text: "❌ Please enter a song name to search." }, { quoted: msg });
     }
@@ -39,7 +42,7 @@ module.exports = {
       }, { quoted: msg });
 
     } catch (err) {
-      console.error(err);
+      console.error("Play command error:", err);
       await sock.sendMessage(from, { text: "⚠️ Error processing your request. Please try again later." }, { quoted: msg });
     }
   }

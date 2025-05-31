@@ -138,8 +138,8 @@ async function startBot() {
     }
   });
 
-  // === MESSAGES ===
-  sock.ev.on("messages.upsert", async ({ messages }) => {
+sock.ev.on("messages.upsert", async ({ messages }) => {
+  try {
     const msg = messages[0];
     if (!msg.message) return;
 
@@ -157,21 +157,15 @@ async function startBot() {
 
     const args = body.trim().split(/\s+/).slice(1);
     const command = commands.get(commandName);
-      if (command === 'nsfwblock') {
-        await nsfwBlockCmd.execute(sock, msg, args, from, sender, isGroup);
-        return; // komandi imekamilika, usisubiri ku-scan nsfw
-      }
 
-      // ... comm
+    // Kwa kuwa command ni object, kuangalia kama ni nsfwblock:
+    if (commandName === 'nsfwblock') {
+      await nsfwBlockCmd.execute(sock, msg, args, from, sender, isGroup);
+      return; // komandi imekamilika, usisubiri ku-scan nsfw
     }
 
-    // Skan messages zote zisizo command kwa NSFW
+    // Scan messages zote zisizo command kwa NSFW
     await nsfwScan(sock, msg);
-
-  } catch (err) {
-    console.error("Message handler error:", err);
-  }
-});
 
     if (AUTO_TYPING) await sock.sendPresenceUpdate('composing', from);
     if (RECORD_VOICE_FAKE) await sock.sendPresenceUpdate('recording', from);
@@ -190,39 +184,39 @@ async function startBot() {
     }
 
     if (ANTILINK_ENABLED && isGroup && antiLinkGroups[from]?.enabled) {
-  if (body.includes("https://chat.whatsapp.com")) {
-    const groupMetadata = await sock.groupMetadata(from);
-    const isAdmin = groupMetadata.participants.find(p => p.id === sender)?.admin != null;
-    const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
-    const botIsAdmin = groupMetadata.participants.find(p => p.id === botJid)?.admin != null;
+      if (body.includes("https://chat.whatsapp.com")) {
+        const groupMetadata = await sock.groupMetadata(from);
+        const isAdmin = groupMetadata.participants.find(p => p.id === sender)?.admin != null;
+        const botJid = sock.user.id.split(":")[0] + "@s.whatsapp.net";
+        const botIsAdmin = groupMetadata.participants.find(p => p.id === botJid)?.admin != null;
 
-    if (!isAdmin && botIsAdmin) {
-      // Initialize warnings
-      antiLinkGroups[from].warns = antiLinkGroups[from].warns || {};
-      antiLinkGroups[from].warns[sender] = (antiLinkGroups[from].warns[sender] || 0) + 1;
-      const warns = antiLinkGroups[from].warns[sender];
+        if (!isAdmin && botIsAdmin) {
+          // Initialize warnings
+          antiLinkGroups[from].warns = antiLinkGroups[from].warns || {};
+          antiLinkGroups[from].warns[sender] = (antiLinkGroups[from].warns[sender] || 0) + 1;
+          const warns = antiLinkGroups[from].warns[sender];
 
-      // Save to file
-      fs.writeFileSync('./antilink.json', JSON.stringify(antiLinkGroups, null, 2));
+          // Save to file
+          fs.writeFileSync('./antilink.json', JSON.stringify(antiLinkGroups, null, 2));
 
-      if (warns >= 3) {
-        // Remove user after 3 warnings
-        await sock.sendMessage(from, {
-          text: `🚫 @${sender.split("@")[0]} you have sent a group link ${warns} times. You will be removed.`,
-          mentions: [sender]
-        });
-        await sock.groupParticipantsUpdate(from, [sender], "remove");
-        delete antiLinkGroups[from].warns[sender];
-      } else {
-        // Warning message
-        await sock.sendMessage(from, {
-          text: `⚠️ @${sender.split("@")[0]} do not share group links! This is warning ${warns}/3.`,
-          mentions: [sender]
-        });
+          if (warns >= 3) {
+            // Remove user after 3 warnings
+            await sock.sendMessage(from, {
+              text: `🚫 @${sender.split("@")[0]} you have sent a group link ${warns} times. You will be removed.`,
+              mentions: [sender]
+            });
+            await sock.groupParticipantsUpdate(from, [sender], "remove");
+            delete antiLinkGroups[from].warns[sender];
+          } else {
+            // Warning message
+            await sock.sendMessage(from, {
+              text: `⚠️ @${sender.split("@")[0]} do not share group links! This is warning ${warns}/3.`,
+              mentions: [sender]
+            });
+          }
+        }
       }
     }
-  }
-}
 
     // Toggle welcome
     if (body === `${PREFIX}welcome`) {
@@ -257,9 +251,11 @@ async function startBot() {
         await sock.sendMessage(from, { text: "❎ Antilink disabled." });
       }
     }
-  });
-}
 
+  } catch (err) {
+    console.error("Message handler error:", err);
+  }
+});
 // === HANDLE VIEW ONCE ===
 async function handleViewOnceMessage(msg, sock) {
   const viewOnce = msg.message?.viewOnceMessage;

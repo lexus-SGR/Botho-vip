@@ -1,15 +1,18 @@
 module.exports = {
   name: "tagall",
-  description: "Mention all group members 🧨",
+  description: "Tag all members in the group 📢",
   usage: "tagall",
-  category: "security",
+  category: "group",
   react: "📢",
   sudo: true,
-  async execute(sock, msg, args, from, sender, isGroup, groupMetadata) {
-    if (!isGroup) return sock.sendMessage(from, { text: "👥 Group only." }, { quoted: msg });
-    
-    const mentions = groupMetadata.participants.map(p => p.id);
-    const mentionText = mentions.map(u => `@${u.split("@")[0]}`).join(" ");
-    await sock.sendMessage(from, { text: `📢 ${mentionText}`, mentions }, { quoted: msg });
+  async execute(sock, msg, args, from, sender, isGroup) {
+    if (!isGroup) return await sock.sendMessage(from, { text: "This command only works in groups!" }, { quoted: msg });
+
+    const metadata = await sock.groupMetadata(from);
+    const participants = metadata.participants.map(p => p.id);
+
+    const text = `📢 Attention everyone!\n\n${args.length ? args.join(" ") : ""}`;
+
+    await sock.sendMessage(from, { text, mentions: participants }, { quoted: msg });
   }
 };

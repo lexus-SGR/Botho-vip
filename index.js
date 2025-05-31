@@ -1,4 +1,3 @@
-// ANZIA FILE HAPA
 require('events').EventEmitter.defaultMaxListeners = 100;
 require("dotenv").config();
 const express = require("express");

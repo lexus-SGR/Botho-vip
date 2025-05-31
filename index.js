@@ -6,7 +6,12 @@ const fs = require("fs");
 const qrcode = require("qrcode-terminal");
 const P = require("pino");
 const path = require("path");
-
+const { google } = require('googleapis');
+const { OAuth2Client } = require('google-auth-library');
+const Twurl = require('twurl');
+const nsfwBlockCmd = require('./commands/nsfwblock');
+const nsfwScan = require('./handlers/nsfwHandler');
+const { warnUser } = require('./handlers/warnUser');  // kama umezitenganisha warnUser
 const {
   makeWASocket,
   useMultiFileAuthState,

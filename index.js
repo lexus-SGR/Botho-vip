@@ -7,8 +7,7 @@ const P = require("pino");
 const path = require("path");
 
 const nsfwBlockCmd = require('./commands/nsfwblock');
-//const nsfwScan = require('./handlers/nsfwHandler');
-//const { warnUser } = require('./handlers/warnUser');
+// const nsfwScan = require('./handlers/nsfwHandler');
 
 const {
   makeWASocket,
@@ -44,6 +43,7 @@ try {
   antiLinkGroups = {};
   fs.writeFileSync('./antilink.json', JSON.stringify(antiLinkGroups, null, 2));
 }
+
 const welcomeGroups = new Set();
 const commands = new Map();
 
@@ -64,7 +64,7 @@ if (fs.existsSync(commandsDir)) {
   }
 }
 
-// ADD A SIMPLE MENU COMMAND
+// ==== ADD MENU COMMAND ====
 commands.set("menu", {
   name: "menu",
   description: "Show all commands",
@@ -80,7 +80,19 @@ ${[...commands.keys()].map(cmd => `🔹 ${PREFIX}${cmd}`).join("\n")}
   }
 });
 
-// ==== BOT START FUNCTION ====
+// ==== HANDLE VIEW ONCE ====
+async function handleViewOnceMessage(msg, sock) {
+  const viewOnceMsg = msg.message?.viewOnceMessageV2Extension?.message;
+  if (viewOnceMsg) {
+    const mediaType = Object.keys(viewOnceMsg)[0];
+    await sock.sendMessage(msg.key.remoteJid, {
+      [mediaType]: viewOnceMsg[mediaType],
+      caption: viewOnceMsg[mediaType]?.caption || "",
+    });
+  }
+}
+
+// ==== START BOT ====
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("./auth");
   const { version } = await fetchLatestBaileysVersion();
@@ -103,17 +115,16 @@ async function startBot() {
 
     if (connection === "close") {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const reason = lastDisconnect?.error?.output?.payload?.reason;
-      console.log(`Connection closed: ${statusCode} - ${reason}`);
-
       const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
       if (shouldReconnect) {
-        console.log("Reconnecting...");
-        await startBot();
+        console.log("🔁 Reconnecting...");
+        startBot();
       } else {
-        console.log("Logged out. Please delete auth folder and scan QR again.");
+        console.log("❌ Logged out. Delete auth folder and rescan QR.");
       }
-    } else if (connection === "open") {
+    }
+
+    if (connection === "open") {
       console.log("✅ Bot connected!");
 
       await sock.sendMessage(OWNER_JID, {
@@ -122,8 +133,7 @@ async function startBot() {
       });
 
       if (AUTO_BIO) {
-        const dateStr = new Date().toLocaleDateString("en-GB");
-        const bio = `👑 cyber loven | 👤 herieth | 📅 ${dateStr}`;
+        const bio = `👑 cyber loven | 👤 herieth | 📅 ${new Date().toLocaleDateString("en-GB")}`;
         try {
           await sock.updateProfileStatus(bio);
         } catch (e) {
@@ -133,20 +143,15 @@ async function startBot() {
     }
   });
 
-  // Group welcome messages
   sock.ev.on("group-participants.update", async (update) => {
     const groupId = update.id;
     if (!welcomeGroups.has(groupId)) return;
 
     for (const participant of update.participants) {
       if (update.action === "add") {
-        try {
-          const meta = await sock.groupMetadata(groupId);
-          const text = `👋 Karibu @${participant.split("@")[0]} kwenye *${meta.subject}*!`;
-          await sock.sendMessage(groupId, { text, mentions: [participant] });
-        } catch (e) {
-          console.error("❌ Welcome message error:", e);
-        }
+        const meta = await sock.groupMetadata(groupId);
+        const text = `👋 Karibu @${participant.split("@")[0]} kwenye *${meta.subject}*!`;
+        await sock.sendMessage(groupId, { text, mentions: [participant] });
       }
     }
   });
@@ -173,14 +178,10 @@ async function startBot() {
       const args = body.trim().split(/\s+/).slice(1);
       const command = commands.get(commandName);
 
-      // If command is nsfwblock run immediately
       if (commandName === "nsfwblock") {
         await nsfwBlockCmd.execute(sock, msg, args, from, sender, isGroup);
         return;
       }
-
-      // NSFW scan for all messages except commands
-     // await nsfwScan(sock, msg);
 
       if (AUTO_TYPING) await sock.sendPresenceUpdate("composing", from);
       if (RECORD_VOICE_FAKE) await sock.sendPresenceUpdate("recording", from);
@@ -192,17 +193,32 @@ async function startBot() {
 
       if (AUTO_VIEW_ONCE) await handleViewOnceMessage(msg, sock);
 
-      // Execute command if found
       if (command) {
         try {
           await command.execute(sock, msg, args, from, sender, isGroup);
         } catch (err) {
-          console.error("Command execution error:", err);
+          console.error("❌ Command error:", err);
           await sock.sendMessage(from, { text: `❌ Error executing command: ${commandName}` });
         }
       }
 
-      // ANTILINK logic
+      // === Welcome Toggle ===
+      if (body === `${PREFIX}welcome`) {
+        if (!isGroup) return;
+        const meta = await sock.groupMetadata(from);
+        const isAdmin = meta.participants.find((p) => p.id === sender)?.admin != null;
+        if (!isAdmin) return;
+
+        if (welcomeGroups.has(from)) {
+          welcomeGroups.delete(from);
+          await sock.sendMessage(from, { text: "👋 Welcome message disabled." });
+        } else {
+          welcomeGroups.add(from);
+          await sock.sendMessage(from, { text: "✅ Welcome message enabled." });
+        }
+      }
+
+      // === Antilink ===
       if (ANTILINK_ENABLED && isGroup && antiLinkGroups[from]?.enabled) {
         if (body.includes("https://chat.whatsapp.com")) {
           const groupMetadata = await sock.groupMetadata(from);
@@ -218,7 +234,7 @@ async function startBot() {
 
             if (warns >= 3) {
               await sock.sendMessage(from, {
-                text: `🚫 @${sender.split("@")[0]} umetoa link ya group ${warns} times. Utaondolewa.`,
+                text: `🚫 @${sender.split("@")[0]} umetoa link ${warns}x. Utaondolewa.`,
                 mentions: [sender],
               });
               await sock.groupParticipantsUpdate(from, [sender], "remove");
@@ -233,27 +249,11 @@ async function startBot() {
         }
       }
 
-      // Toggle welcome messages
-      if (body === `${PREFIX}welcome`) {
-        if (!isGroup) return;
-        const groupMetadata = await sock.groupMetadata(from);
-        const isAdmin = groupMetadata.participants.find((p) => p.id === sender)?.admin != null;
-        if (!isAdmin) return;
-
-        if (welcomeGroups.has(from)) {
-          welcomeGroups.delete(from);
-          await sock.sendMessage(from, { text: "👋 Welcome message disabled." });
-        } else {
-          welcomeGroups.add(from);
-          await sock.sendMessage(from, { text: "✅ Welcome message enabled." });
-        }
-      }
-
-      // Toggle antilink
+      // === Antilink Toggle ===
       if (body.startsWith(`${PREFIX}antilink`)) {
         if (!isGroup) return;
-        const groupMetadata = await sock.groupMetadata(from);
-        const isAdmin = groupMetadata.participants.find((p) => p.id === sender)?.admin != null;
+        const meta = await sock.groupMetadata(from);
+        const isAdmin = meta.participants.find((p) => p.id === sender)?.admin != null;
         if (!isAdmin) return;
 
         const option = args[0]?.toLowerCase();
@@ -269,23 +269,9 @@ async function startBot() {
       }
 
     } catch (err) {
-      console.error("Message handler error:", err);
+      console.error("❌ Message handler error:", err);
     }
   });
-
-  // HANDLE VIEW ONCE MESSAGES
-  async function handleViewOnceMessage(msg, sock) {
-    const viewOnce = msg.message?.viewOnceMessage;
-    if (!viewOnce) return;
-
-    try {
-      const viewOnceContent = viewOnce.message;
-      const from = msg.key.remoteJid;
-      await sock.sendMessage(from, { ...viewOnceContent, viewOnce: false });
-    } catch (e) {
-      console.error("❌ View once error:", e);
-    }
-  }
 }
 
-startBot().catch((err) => console.error("Start error:", err));
+startBot();

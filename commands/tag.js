@@ -1,7 +1,7 @@
 module.exports = {
-  name: "tag",
+  name: "tagall",
   description: "Mention all group members 🧨",
-  usage: "tag",
+  usage: "tagall",
   category: "security",
   react: "📢",
   sudo: true,

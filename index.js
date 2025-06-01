@@ -175,6 +175,9 @@ async function startBot() {
       const msg = messages[0];
     //  if (!msg.message || msg.key.fromMe) return;
       console.log("📩 Message received:", msg);
+      console.log("📩 Message received:", msg);
+     // if (!msg.message || msg.key.fromMe) return;
+
       const from = msg.key.remoteJid;
       const isGroup = from.endsWith("@g.us");
       const sender = msg.key.participant || msg.key.remoteJid;
@@ -187,6 +190,9 @@ async function startBot() {
         "";
 if (!msg.message || !isOwner) return;
       
+
+if (!msg.message || !isOwner) return;
+
       // Anti-link check
       if (
         ANTILINK_ENABLED &&

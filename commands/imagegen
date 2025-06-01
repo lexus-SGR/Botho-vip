@@ -1,0 +1,40 @@
+import axios from 'axios'
+import figlet from 'figlet'
+import chalk from 'chalk'
+
+export const command = 'imagegen'
+export const desc = '🎨 Unda picha kwa kutumia Stability AI'
+export const handler = async (m, { text, conn, usedPrefix, command }) => {
+  if (!text) {
+    return m.reply(`🎨 *Image Generator*\n\n🤖 Tumia mfano:\n${usedPrefix}${command} sunset over ocean`)
+  }
+
+  try {
+    const loadingText = figlet.textSync('Stability AI', { font: 'Standard' })
+    await m.reply(`\`\`\`\n${loadingText}\n\`\`\`\n\n🎨 *Inatengeneza picha... Tafadhali subiri...*`)
+
+    const response = await axios.post('https://api.stability.ai/v1/generation/text-to-image', {
+      prompt: text,
+      width: 512,
+      height: 512,
+      samples: 1,
+      steps: 30,
+    }, {
+      headers: {
+        'Authorization': `Bearer ${process.env.STABILITY_API_KEY}`,
+        'Content-Type': 'application/json',
+      }
+    })
+
+    if (!response.data || !response.data.artifacts || response.data.artifacts.length === 0) {
+      return m.reply('❌ Hakuna picha iliyo tengenezwa. Jaribu tena na maelezo tofauti.')
+    }
+
+    const imgBase64 = response.data.artifacts[0].base64
+    await conn.sendMessage(m.chat, { image: { url: `data:image/png;base64,${imgBase64}` }, caption: `🎨 Picha yako ya: ${text}` }, { quoted: m })
+
+  } catch (error) {
+    console.log(chalk.red('[STABILITY AI ERROR]'), error)
+    await m.reply('❌ Imeshindikana kutengeneza picha. Hakikisha API Key ni sahihi au jaribu tena baadaye.')
+  }
+}

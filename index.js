@@ -57,6 +57,22 @@ const welcomeGroups = new Set();
 
 // COMMANDS Map
 const commands = new Map();
+// Load commands from 'commands' folder
+const commandsPath = path.join(__dirname, "commands");
+
+if (fs.existsSync(commandsPath)) {
+  fs.readdirSync(commandsPath).forEach((file) => {
+    if (file.endsWith(".js")) {
+      const command = require(path.join(commandsPath, file));
+      if (command.name && typeof command.execute === "function") {
+        commands.set(command.name.toLowerCase(), command);
+        console.log(`✅ Command loaded: ${command.name}`);
+      } else {
+        console.warn(`⚠️ Skipping invalid command file: ${file}`);
+      }
+    }
+  });
+}
 
 // Command: NSFW Block on/off
 commands.set("nsfwblock", {

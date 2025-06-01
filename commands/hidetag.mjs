@@ -23,7 +23,7 @@ export default {
     }, { quoted: msg });
 
     await sock.sendMessage(from, {
-      react: { text: "👻", key }
+      react: { text: "🎤", key }
     });
   }
 };

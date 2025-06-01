@@ -5,6 +5,7 @@ import dotenv from "dotenv"; dotenv.config();
 import figlet from "figlet";
 import fs from "fs"; 
 import path from "path"; 
+import { exec } from "child_process";
 import qrcode from "qrcode-terminal"; 
 import qrcodeImg from "qrcode"; 
 import P from "pino"; 

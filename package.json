@@ -2,10 +2,11 @@
   "name": "botho-vip",
   "version": "1.0.0",
   "description": "Pair code generator and WhatsApp bot with multi services",
-  "main": "index.js",
+  "main": "index.mjs",
+  "type": "module",
   "scripts": {
-    "start-server": "node server.js",
-    "start-bot": "node index.js",
+    "start-server": "node server.mjs",
+    "start-bot": "node index.mjs",
     "start": "concurrently \"npm run start-server\" \"npm run start-bot\""
   },
   "dependencies": {

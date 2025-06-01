@@ -30,12 +30,17 @@ const AUTO_BIO = true;
 const AUTO_VIEW_ONCE = process.env.AUTO_VIEW_ONCE === "on"; 
 const AUTO_VIEW_STATUS = process.env.AUTO_VIEW_STATUS === "on"; 
 const ANTILINK_ENABLED = process.env.ANTILINK === "on"; 
-const tenorApiKey = process.env.TENOR_API_KEY;
-
-
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const STABILITY_API_KEY = process.env.STABILITY_API_KEY;
+const DEEPAI_API_KEY = process.env.DEEPAI_API_KEY;
+const PDF_API_KEY = process.env.PDF_API_KEY;
+const REMOVE_BG_KEY = process.env.REMOVE_BG_KEY;
+const SERPAPI_KEY = process.env.SERPAPI_KEY;
+const TENOR_API_KEY = process.env.TENOR_API_KEY;
+const VOICE_RSS_KEY = process.env.VOICE_RSS_KEY;
 const AUTO_TYPING = process.env.AUTO_TYPING === "on"; 
 const RECORD_VOICE_FAKE = process.env.RECORD_VOICE_FAKE === "on"; 
-const AUTO_REACT_EMOJI = process.env.AUTO_REACT_EMOJI || "";
+const AUTO_REACT_EMOJI = process.env.AUTO_REACT_EMOJI || "🇹🇿";
 
 const app = express(); 
 const PORT = process.env.PORT || 3000; 

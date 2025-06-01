@@ -1,3 +1,4 @@
+// index.mjs
 import { EventEmitter } from "events";
 EventEmitter.defaultMaxListeners = 100;
 
@@ -17,6 +18,7 @@ import {
   DisconnectReason,
   fetchLatestBaileysVersion,
   makeCacheableSignalKeyStore,
+  downloadMediaMessage,
 } from "@whiskeysockets/baileys";
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
@@ -38,47 +40,33 @@ const PORT = process.env.PORT || 3000;
 
 let lastQRCode = null;
 
-// JSON Paths
+// JSON Files
 const antiLinkFile = path.join(__dirname, "antilink.json");
 const nsfwSettingsFile = path.join(__dirname, "nsfwsettings.json");
 
-// Load JSON files
-let antiLinkGroups = fs.existsSync(antiLinkFile)
-  ? JSON.parse(fs.readFileSync(antiLinkFile, "utf-8"))
-  : {};
-let nsfwSettings = fs.existsSync(nsfwSettingsFile)
-  ? JSON.parse(fs.readFileSync(nsfwSettingsFile, "utf-8"))
-  : {};
-
-// Welcome toggle
+let antiLinkGroups = fs.existsSync(antiLinkFile) ? JSON.parse(fs.readFileSync(antiLinkFile)) : {};
+let nsfwSettings = fs.existsSync(nsfwSettingsFile) ? JSON.parse(fs.readFileSync(nsfwSettingsFile)) : {};
 const welcomeGroups = new Set();
+const commands = new Map();
 
 // Commands
-const commands = new Map();
-const commandsPath = path.join(__dirname, "commands");
+commands.set("menu", {
+  name: "menu",
+  description: "List of commands",
+  async execute(sock, msg, args, from, sender, isGroup) {
+    const text = `
+🤖 *lovenness-cyber Bot Menu* 🤖
+${[...commands.keys()].map((cmd) => `🔹 ${PREFIX}${cmd}`).join("\n")}
+👑 Owner: @${OWNER_NUMBER}
+    `;
+    await sock.sendMessage(from, { text, mentions: [OWNER_JID] });
+  },
+});
 
-if (fs.existsSync(commandsPath)) {
-  const files = fs.readdirSync(commandsPath);
-  for (const file of files) {
-    if (file.endsWith(".js")) {
-      // Dynamically import ES module command
-      const commandModule = await import(path.join(commandsPath, file));
-      const command = commandModule.default || commandModule;
-      if (command.name && typeof command.execute === "function") {
-        commands.set(command.name.toLowerCase(), command);
-        console.log(`✅ Loaded command: ${command.name}`);
-      }
-    }
-  }
-}
-
-// Manual commands
 commands.set("nsfwblock", {
   name: "nsfwblock",
-  description: "Enable or disable NSFW blocker",
   async execute(sock, msg, args, from, sender, isGroup) {
-    if (!isGroup)
-      return await sock.sendMessage(from, { text: "Group only command." });
+    if (!isGroup) return await sock.sendMessage(from, { text: "Group only command." });
     const arg = args[0]?.toLowerCase();
     if (arg !== "on" && arg !== "off")
       return await sock.sendMessage(from, { text: `Usage: ${PREFIX}nsfwblock on/off` });
@@ -88,22 +76,6 @@ commands.set("nsfwblock", {
   },
 });
 
-commands.set("menu", {
-  name: "menu",
-  description: "List of commands",
-  async execute(sock, msg, args, from, sender, isGroup) {
-    const text = `
-🤖 *lovenness-cyber Bot Menu* 🤖
-
-${[...commands.keys()].map((cmd) => `🔹 ${PREFIX}${cmd}`).join("\n")}
-
-👑 Owner: @${OWNER_NUMBER}
-    `;
-    await sock.sendMessage(from, { text, mentions: [OWNER_JID] });
-  },
-});
-
-// View once
 async function handleViewOnceMessage(msg, sock) {
   const viewOnceMsg = msg.message?.viewOnceMessageV2Extension?.message;
   if (viewOnceMsg) {
@@ -126,6 +98,7 @@ async function startBot() {
       keys: makeCacheableSignalKeyStore(state.keys, P({ level: "silent" })),
     },
     logger: P({ level: "silent" }),
+    printQRInTerminal: true,
   });
 
   sock.ev.on("creds.update", saveCreds);
@@ -134,7 +107,6 @@ async function startBot() {
     if (qr) {
       lastQRCode = qr;
       qrcode.generate(qr, { small: true });
-      console.log("📷 Scan QR code above.");
     }
 
     if (connection === "close") {
@@ -150,7 +122,7 @@ async function startBot() {
     if (connection === "open") {
       console.log("✅ Bot connected.");
       await sock.sendMessage(OWNER_JID, {
-        text: `🤖 *lovenness-cyber Bot Connected*\nType ${PREFIX}menu to begin.`,
+        text: `🤖 *Bot Connected*\nType ${PREFIX}menu to begin.`,
         mentions: [OWNER_JID],
       });
 
@@ -166,13 +138,12 @@ async function startBot() {
   });
 
   sock.ev.on("group-participants.update", async (update) => {
-    const groupId = update.id;
-    if (!welcomeGroups.has(groupId)) return;
+    if (!welcomeGroups.has(update.id)) return;
     for (const participant of update.participants) {
       if (update.action === "add") {
-        const meta = await sock.groupMetadata(groupId);
+        const meta = await sock.groupMetadata(update.id);
         const text = `👋 Welcome @${participant.split("@")[0]} to *${meta.subject}*!`;
-        await sock.sendMessage(groupId, { text, mentions: [participant] });
+        await sock.sendMessage(update.id, { text, mentions: [participant] });
       }
     }
   });
@@ -193,9 +164,30 @@ async function startBot() {
         msg.message.imageMessage?.caption ||
         "";
 
+      if (AUTO_VIEW_ONCE) await handleViewOnceMessage(msg, sock);
+
+      // Anti-Delete
+      sock.ev.on("messages.delete", async (del) => {
+        if (!del || !del.keys) return;
+        for (const key of del.keys) {
+          if (key.fromMe) continue;
+          const message = await sock.loadMessage(key.remoteJid, key.id);
+          if (message) {
+            const content = message.message;
+            const type = Object.keys(content)[0];
+            const senderNum = key.participant.split("@")[0];
+            await sock.sendMessage(key.remoteJid, {
+              text: `♻️ *Anti-Delete*\nMessage from @${senderNum}:\n\n${
+                content[type]?.text || "[media or unsupported content]"
+              }`,
+              mentions: [key.participant],
+            });
+          }
+        }
+      });
+
       if (!body.startsWith(PREFIX)) return;
 
-      // Antilink
       if (
         ANTILINK_ENABLED &&
         isGroup &&
@@ -203,7 +195,7 @@ async function startBot() {
         body.includes("https://chat.whatsapp.com")
       ) {
         await sock.groupRemove(from, [sender]);
-        await sock.sendMessage(from, { text: "🚫 Group links are not allowed!" });
+        await sock.sendMessage(from, { text: "🚫 Group links not allowed!" });
         return;
       }
 
@@ -219,7 +211,6 @@ async function startBot() {
           react: { text: AUTO_REACT_EMOJI, key: msg.key },
         });
       }
-      if (AUTO_VIEW_ONCE) await handleViewOnceMessage(msg, sock);
 
       await command.execute(sock, msg, args, from, sender, isGroup);
 
@@ -229,10 +220,10 @@ async function startBot() {
         if (!isAdmin) return;
         if (welcomeGroups.has(from)) {
           welcomeGroups.delete(from);
-          await sock.sendMessage(from, { text: "👋 Welcome message turned OFF." });
+          await sock.sendMessage(from, { text: "👋 Welcome turned OFF." });
         } else {
           welcomeGroups.add(from);
-          await sock.sendMessage(from, { text: "✅ Welcome message turned ON." });
+          await sock.sendMessage(from, { text: "✅ Welcome turned ON." });
         }
       }
     } catch (err) {
@@ -243,13 +234,12 @@ async function startBot() {
   console.log("🤖 Bot initialized.");
 }
 
-// EXPRESS ROUTES
 app.get("/", (req, res) => {
   res.send("💡 lovenness-cyber WhatsApp bot is online!");
 });
 
 app.get("/qr", (req, res) => {
-  if (!lastQRCode) return res.send("📷 QR code not ready.");
+  if (!lastQRCode) return res.send("📷 QR not ready.");
   qrcodeImg.toDataURL(lastQRCode, (err, url) => {
     if (err) return res.send("⚠️ QR error.");
     res.send(`<img src="${url}" alt="QR Code">`);
@@ -257,8 +247,7 @@ app.get("/qr", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🌐 Express server running on http://localhost:${PORT}`);
+  console.log(`🌐 Express server running: http://localhost:${PORT}`);
 });
 
-// START BOT
 startBot();

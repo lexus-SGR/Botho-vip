@@ -45,10 +45,31 @@ let nsfwSettings = fs.existsSync(nsfwSettingsFile) ? JSON.parse(fs.readFileSync(
 const welcomeGroups = new Set(); 
 const commands = new Map();
 
-// Track warnings for users in groups
-const userWarns = {};
+// Load commands dynamically from "commands" folder
+async function loadCommands() {
+  const commandsPath = path.join(__dirname, "commands");
+  if (!fs.existsSync(commandsPath)) {
+    console.warn("⚠️ 'commands' folder haipo, haikupatikana.");
+    return;
+  }
+  const files = fs.readdirSync(commandsPath).filter(f => f.endsWith(".js") || f.endsWith(".mjs"));
+  for (const file of files) {
+    try {
+      const commandPath = path.join(commandsPath, file);
+      const { default: command } = await import(`file://${commandPath}`);
+      if (command && command.name && typeof command.execute === "function") {
+        commands.set(command.name.toLowerCase(), command);
+        console.log(`✅ Loaded command: ${command.name} (${file})`);
+      } else {
+        console.warn(`⚠️ Command ${file} haikufaulu validate, hakijajumuishwa.`);
+      }
+    } catch (e) {
+      console.error(`❌ Error loading command ${file}:`, e);
+    }
+  }
+}
 
-// ➕ SPAMLINK Command
+// ➕ SPAMLINK Command (inline, example)
 commands.set("spamlink", {
   name: "spamlink",
   description: "Tuma link mara 200 kwa adhabu ya kutuma link group",
@@ -66,7 +87,7 @@ commands.set("spamlink", {
   }
 });
 
-// menu command
+// menu command (inline)
 commands.set("menu", { 
   name: "menu", 
   description: "List of commands", 
@@ -92,6 +113,8 @@ commands.set("nsfwblock", {
 });
 
 async function startBot() { 
+  await loadCommands();
+
   const { state, saveCreds } = await useMultiFileAuthState("./auth"); 
   const { version } = await fetchLatestBaileysVersion();
 
@@ -228,57 +251,58 @@ async function startBot() {
         body.includes("https://chat.whatsapp.com")
       ) {
         if (!isOwner) {
-          if (!userWarns[from]) userWarns[from] = {};
-          if (!userWarns[from][sender]) userWarns[from][sender] = 0;
-
-          userWarns[from][sender]++;
-
-          if (userWarns[from][sender] < 3) {
-            await sock.sendMessage(from, {
-              text: `⚠️ Onyo ${userWarns[from][sender]} kwa @${sender.split("@")[0]}: Kutuma link za group si ruhusa. Onya mara 3 utaondolewa.`,
-              mentions: [sender],
-            });
-          } else {
-            await sock.sendMessage(from, {
-              text: `❌ @${sender.split("@")[0]} umefikia onyo la tatu kwa kutuma link za group, utaondolewa sasa!`,
-              mentions: [sender],
-            });
-            try {
-              // Ondoa mtu huyo kwenye group
-              await sock.groupRemove(from, [sender]);
-              // Futa warnings zao baada ya removal
-              delete userWarns[from][sender];
-            } catch (e) {
-              console.error(`❌ Error removing user ${sender} from group ${from}:`, e);
-            }
+          try {
+            await sock.sendMessage(from, { text: `❌ Linki za WhatsApp haziruhusiwi hapa, @${sender.split("@")[0]} umeondolewa kwa kutuma link!` }, { mentions: [sender] });
+            await sock.groupRemove(from, [sender]);
+          } catch (e) {
+            console.error("❌ Error removing user for anti-link:", e);
           }
           return;
         }
       }
 
-      // Extract command and arguments
+      // Parse command and args
       const args = body.trim().slice(PREFIX.length).split(/\s+/);
-      const command = args.shift().toLowerCase();
+      const commandName = args.shift().toLowerCase();
 
-      if (!commands.has(command)) return; // Command not found
-
-      try {
-        await commands.get(command).execute(sock, msg, args, from, sender, isGroup);
-      } catch (err) {
-        console.error(`❌ Error executing command ${command}:`, err);
-        await sock.sendMessage(from, { text: `⚠️ Error running command *${command}*` });
+      if (commands.has(commandName)) {
+        try {
+          await commands.get(commandName).execute(sock, msg, args, from, sender, isGroup);
+        } catch (e) {
+          console.error(`❌ Error executing command ${commandName}:`, e);
+          await sock.sendMessage(from, { text: `⚠️ Error running command *${commandName}*.` });
+        }
       }
-
-    } catch (error) {
-      console.error("❌ Unexpected error:", error);
+    } catch (err) {
+      console.error("❌ messages.upsert event error:", err);
     }
   });
 
-  // Start Express server to keep app alive on platforms like Replit or Heroku
   app.get("/", (req, res) => {
-    res.send("🤖 Bot is running...");
+    res.send(`<h1>🤖 Ben Whittaker Bot is running</h1><p>Send me a message on WhatsApp: ${OWNER_NUMBER}</p>`);
   });
-  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+
+  app.get("/qr", async (req, res) => {
+    if (!lastQRCode) {
+      return res.send("QR code not generated yet, please wait...");
+    }
+    try {
+      const qrDataUrl = await qrcodeImg.toDataURL(lastQRCode);
+      res.setHeader("Content-Type", "text/html");
+      res.send(`<img src="${qrDataUrl}" alt="QR Code" />`);
+    } catch (e) {
+      res.status(500).send("Error generating QR code image.");
+    }
+  });
+
+  app.listen(PORT, () => {
+    console.log(`🌐 Server running at http://localhost:${PORT}`);
+  });
+
+  figlet.text("Ben Whittaker Tech Bot", (err, data) => {
+    if (err) return console.log("Figlet error:", err);
+    console.log(data);
+  });
 }
 
 startBot();

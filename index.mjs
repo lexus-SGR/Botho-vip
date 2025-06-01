@@ -4,7 +4,7 @@ import { EventEmitter } from "events";
 EventEmitter.defaultMaxListeners = 100;
 
 import dotenv from "dotenv"; dotenv.config();
-
+import figlet from "figlet";
 import fs from "fs"; 
 import path from "path"; 
 import qrcode from "qrcode-terminal"; 

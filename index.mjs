@@ -23,7 +23,6 @@ import {
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
-// SETTINGS
 const OWNER_NUMBER = "255654478605";
 const OWNER_JID = OWNER_NUMBER + "@s.whatsapp.net";
 const PREFIX = "😁";
@@ -40,7 +39,6 @@ const PORT = process.env.PORT || 3000;
 
 let lastQRCode = null;
 
-// JSON Files
 const antiLinkFile = path.join(__dirname, "antilink.json");
 const nsfwSettingsFile = path.join(__dirname, "nsfwsettings.json");
 
@@ -49,7 +47,6 @@ let nsfwSettings = fs.existsSync(nsfwSettingsFile) ? JSON.parse(fs.readFileSync(
 const welcomeGroups = new Set();
 const commands = new Map();
 
-// Commands
 commands.set("menu", {
   name: "menu",
   description: "List of commands",
@@ -148,6 +145,38 @@ async function startBot() {
     }
   });
 
+  // ✅ Moved this OUTSIDE so it registers once
+  sock.ev.on("messages.delete", async (del) => {
+    if (!del || !del.keys) return;
+    for (const key of del.keys) {
+      if (key.fromMe) continue;
+      try {
+        const message = await sock.loadMessage(key.remoteJid, key.id);
+        if (message) {
+          const content = message.message;
+          const type = Object.keys(content || {})[0];
+          const senderNum = key.participant.split("@")[0];
+          let textMsg = "";
+
+          if (content?.[type]?.text) {
+            textMsg = content[type].text;
+          } else if (type === "conversation") {
+            textMsg = content.conversation;
+          } else {
+            textMsg = "[media or unsupported content]";
+          }
+
+          await sock.sendMessage(key.remoteJid, {
+            text: `♻️ *Anti-Delete*\nMessage from @${senderNum}:\n\n${textMsg}`,
+            mentions: [key.participant],
+          });
+        }
+      } catch (e) {
+        console.error("⚠️ Anti-delete error:", e.message);
+      }
+    }
+  });
+
   sock.ev.on("messages.upsert", async ({ messages }) => {
     try {
       const msg = messages[0];
@@ -165,26 +194,6 @@ async function startBot() {
         "";
 
       if (AUTO_VIEW_ONCE) await handleViewOnceMessage(msg, sock);
-
-      // Anti-Delete
-      sock.ev.on("messages.delete", async (del) => {
-        if (!del || !del.keys) return;
-        for (const key of del.keys) {
-          if (key.fromMe) continue;
-          const message = await sock.loadMessage(key.remoteJid, key.id);
-          if (message) {
-            const content = message.message;
-            const type = Object.keys(content)[0];
-            const senderNum = key.participant.split("@")[0];
-            await sock.sendMessage(key.remoteJid, {
-              text: `♻️ *Anti-Delete*\nMessage from @${senderNum}:\n\n${
-                content[type]?.text || "[media or unsupported content]"
-              }`,
-              mentions: [key.participant],
-            });
-          }
-        }
-      });
 
       if (!body.startsWith(PREFIX)) return;
 

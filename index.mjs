@@ -1,6 +1,5 @@
 import { EventEmitter } from "events"; 
 EventEmitter.defaultMaxListeners = 100;
-import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import dotenv from "dotenv"; dotenv.config();
 import figlet from "figlet";
 import fs from "fs"; 

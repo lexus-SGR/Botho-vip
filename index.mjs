@@ -1,5 +1,3 @@
-// index.mjs
-
 import { EventEmitter } from "events"; 
 EventEmitter.defaultMaxListeners = 100;
 
@@ -47,6 +45,9 @@ let nsfwSettings = fs.existsSync(nsfwSettingsFile) ? JSON.parse(fs.readFileSync(
 const welcomeGroups = new Set(); 
 const commands = new Map();
 
+// Track warnings for users in groups
+const userWarns = {};
+
 // ➕ SPAMLINK Command
 commands.set("spamlink", {
   name: "spamlink",
@@ -70,7 +71,10 @@ commands.set("menu", {
   name: "menu", 
   description: "List of commands", 
   async execute(sock, msg, args, from, sender, isGroup) { 
-    const text = `\n🤖 *lovenness-cyber Bot Menu* 🤖\n${[...commands.keys()].map((cmd) => `🔹 ${PREFIX}${cmd}`).join("\n")}\n👑 Owner: @${OWNER_NUMBER}`; 
+    const commandList = [...commands.keys()]
+      .map((cmd) => `🔹 ${PREFIX}${cmd}`)
+      .join("\n");
+    const text = `\n🤖 *lovenness-cyber Bot Menu* 🤖\n${commandList}\n\n👑 Owner: @${OWNER_NUMBER}`; 
     await sock.sendMessage(from, { text, mentions: [OWNER_JID] }); 
   }, 
 });
@@ -186,7 +190,7 @@ async function startBot() {
   sock.ev.on("messages.upsert", async ({ messages }) => { 
     try { 
       const msg = messages[0]; 
-     // if (!msg.message || msg.key.fromMe) return; 
+      if (!msg.message || msg.key.fromMe) return; 
       const from = msg.key.remoteJid; 
       const isGroup = from.endsWith("@g.us"); 
       const sender = msg.key.participant || msg.key.remoteJid; 
@@ -216,69 +220,65 @@ async function startBot() {
 
       if (!body.startsWith(PREFIX)) return;
 
-      // kuendelea na sehemu ya anti-link kick...
-if (
-  ANTILINK_ENABLED &&
-  isGroup &&
-  antiLinkGroups[from]?.enabled &&
-  body.includes("https://chat.whatsapp.com")
-) {
-  if (!isOwner) {
-    // Ongeza warn count
-    if (!userWarns[from]) userWarns[from] = {};
-    if (!userWarns[from][sender]) userWarns[from][sender] = 0;
+      // Anti-link kick logic
+      if (
+        ANTILINK_ENABLED &&
+        isGroup &&
+        antiLinkGroups[from]?.enabled &&
+        body.includes("https://chat.whatsapp.com")
+      ) {
+        if (!isOwner) {
+          if (!userWarns[from]) userWarns[from] = {};
+          if (!userWarns[from][sender]) userWarns[from][sender] = 0;
 
-    userWarns[from][sender]++;
+          userWarns[from][sender]++;
 
-    if (userWarns[from][sender] < 3) {
-      await sock.sendMessage(from, {
-        text: `⚠️ Onyo ${userWarns[from][sender]} kwa @${sender.split("@")[0]}: Kutuma link za group si ruhusa. Onya mara 3 utaondolewa.`,
-        mentions: [sender],
-      });
-    } else {
-      await sock.sendMessage(from, {
-        text: `❌ @${sender.split("@")[0]} umefikia onyo la tatu kwa kutuma link za group, utaondolewa sasa!`,
-        mentions: [sender],
-      });
-      await sock.groupParticipantsUpdate(from, [sender], "remove");
-      userWarns[from][sender] = 0; // reset after kick
-    }
-    return;
-  }
-}
+          if (userWarns[from][sender] < 3) {
+            await sock.sendMessage(from, {
+              text: `⚠️ Onyo ${userWarns[from][sender]} kwa @${sender.split("@")[0]}: Kutuma link za group si ruhusa. Onya mara 3 utaondolewa.`,
+              mentions: [sender],
+            });
+          } else {
+            await sock.sendMessage(from, {
+              text: `❌ @${sender.split("@")[0]} umefikia onyo la tatu kwa kutuma link za group, utaondolewa sasa!`,
+              mentions: [sender],
+            });
+            try {
+              // Ondoa mtu huyo kwenye group
+              await sock.groupRemove(from, [sender]);
+              // Futa warnings zao baada ya removal
+              delete userWarns[from][sender];
+            } catch (e) {
+              console.error(`❌ Error removing user ${sender} from group ${from}:`, e);
+            }
+          }
+          return;
+        }
+      }
 
-      // Parsing command and args
-      const args = body.slice(PREFIX.length).trim().split(/ +/);
-      const commandName = args.shift().toLowerCase();
+      // Extract command and arguments
+      const args = body.trim().slice(PREFIX.length).split(/\s+/);
+      const command = args.shift().toLowerCase();
 
-      if (!commands.has(commandName)) return;
+      if (!commands.has(command)) return; // Command not found
 
       try {
-        await commands.get(commandName).execute(sock, msg, args, from, sender, isGroup);
-      } catch (e) {
-        console.error(`❌ Error executing command ${commandName}:`, e);
-        await sock.sendMessage(from, { text: `❌ Error executing command *${commandName}*.` });
+        await commands.get(command).execute(sock, msg, args, from, sender, isGroup);
+      } catch (err) {
+        console.error(`❌ Error executing command ${command}:`, err);
+        await sock.sendMessage(from, { text: `⚠️ Error running command *${command}*` });
       }
-    } catch (err) {
-      console.error("❌ Message processing error:", err);
+
+    } catch (error) {
+      console.error("❌ Unexpected error:", error);
     }
   });
 
-  // Express server to keep app alive
+  // Start Express server to keep app alive on platforms like Replit or Heroku
   app.get("/", (req, res) => {
-    res.send("🤖 lovenness-cyber Bot is running!");
+    res.send("🤖 Bot is running...");
   });
-
-  app.get("/qr", (req, res) => {
-    if (!lastQRCode) return res.send("QR code not generated yet.");
-    qrcodeImg.toDataURL(lastQRCode).then((url) => {
-      res.send(`<img src="${url}" alt="QR Code">`);
-    });
-  });
-
-  app.listen(PORT, () => {
-    console.log(`🌐 Server running on port ${PORT}`);
-  });
+  app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 }
 
-startBot().catch((err) => console.error("❌ Failed to start bot:", err));
+startBot();

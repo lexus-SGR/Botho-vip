@@ -1,36 +1,48 @@
 export default {
   name: "listonline",
-  description: "Ona majina ya watu walioko online kwenye group",
+  description: "Onesha members walio online kwenye group",
   category: "group",
-  usage: "!listonline",
+  usage: "😁listonline",
   async execute(sock, msg) {
     const { from, isGroup, key } = msg;
+
     if (!isGroup) {
-      return await sock.sendMessage(from, { text: "Command hii ni kwa group tu." }, { quoted: msg });
+      return await sock.sendMessage(from, {
+        text: "⚠️ Amri hii inafanya kazi kwenye magroup tu!"
+      }, { quoted: msg });
     }
 
     const groupMetadata = await sock.groupMetadata(from);
-    const presence = sock.presences.get(from) || {};
+    const participants = groupMetadata.participants;
 
-    const onlineParticipants = [];
-    for (const [participant, presenceInfo] of Object.entries(presence)) {
-      if (presenceInfo.presence === 'available') {
-        const user = groupMetadata.participants.find(p => p.id === participant);
-        if (user) onlineParticipants.push(user.id.split("@")[0]);
+    let onlineMembers = [];
+
+    for (let user of participants) {
+      try {
+        const presence = await sock.presenceSubscribe(user.id);
+        if (presence && presence.lastKnownPresence === "available") {
+          onlineMembers.push(user.id);
+        }
+      } catch (e) {
+        // Skip kama kuna error kwa mtu mmoja
       }
     }
 
-    if (onlineParticipants.length === 0) {
-      await sock.sendMessage(from, { text: "Hakuna mtu yuko online sasa." }, { quoted: msg });
-      // react with sad emoji 😔
-      await sock.sendMessage(from, { react: { text: "😔", key } });
-      return;
+    if (onlineMembers.length === 0) {
+      return await sock.sendMessage(from, {
+        text: "🙁 Hakuna aliye online kwa sasa."
+      }, { quoted: msg });
     }
 
-    const onlineList = onlineParticipants.map(u => `@${u}`).join('\n');
-    await sock.sendMessage(from, { text: `Watu walioko online:\n${onlineList}`, mentions: onlineParticipants.map(u => u + '@s.whatsapp.net') }, { quoted: msg });
+    const mentionList = onlineMembers.map((id, i) => `${i + 1}. @${id.split("@")[0]}`).join("\n");
 
-    // react with eyes emoji 👀
-    await sock.sendMessage(from, { react: { text: "👀", key } });
+    await sock.sendMessage(from, {
+      text: `📶 *Online Members (${onlineMembers.length}):*\n\n${mentionList}`,
+      mentions: onlineMembers
+    }, { quoted: msg });
+
+    await sock.sendMessage(from, {
+      react: { text: "✅", key }
+    });
   }
 };

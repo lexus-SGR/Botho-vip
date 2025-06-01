@@ -1,22 +1,29 @@
 export default {
   name: "hidetag",
-  description: "Tuma ujumbe kwa wote wa group bila kutaja majina (hidden tag)",
+  description: "Tuma ujumbe kwa group bila kuonyesha majina yao (silent tag)",
   category: "group",
-  usage: "!hidetag <message>",
+  usage: "😁hidetag Hello group!",
   async execute(sock, msg) {
-    const { from, isGroup, sender, body, key } = msg;
-    if (!isGroup) {
-      return await sock.sendMessage(from, { text: "Command hii ni kwa group tu." }, { quoted: msg });
-    }
-    const message = body.slice(8).trim();
-    if (!message) {
-      return await sock.sendMessage(from, { text: "Tafadhali andika ujumbe baada ya !hidetag" }, { quoted: msg });
-    }
-    const groupMetadata = await sock.groupMetadata(from);
-    const participants = groupMetadata.participants.map(p => p.id);
-    await sock.sendMessage(from, { text: message, mentions: participants }, { quoted: msg });
+    const { key, body, from, isGroup } = msg;
 
-    // react with emoji 🎤
-    await sock.sendMessage(from, { react: { text: "🎤", key } });
+    if (!isGroup) {
+      return await sock.sendMessage(from, {
+        text: "⚠️ Hii amri inapatikana tu kwenye magroup.",
+      }, { quoted: msg });
+    }
+
+    const groupMetadata = await sock.groupMetadata(from);
+    const members = groupMetadata.participants.map(p => p.id);
+
+    const message = body.split(' ').slice(1).join(' ') || "📢 Hello everyone!";
+    
+    await sock.sendMessage(from, {
+      text: message,
+      mentions: members,
+    }, { quoted: msg });
+
+    await sock.sendMessage(from, {
+      react: { text: "👻", key }
+    });
   }
 };

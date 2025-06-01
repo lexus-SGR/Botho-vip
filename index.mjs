@@ -95,7 +95,7 @@ async function startBot() {
       keys: makeCacheableSignalKeyStore(state.keys, P({ level: "silent" })),
     },
     logger: P({ level: "silent" }),
-    printQRInTerminal: true,
+    printQRInTerminal: false,
   });
 
   sock.ev.on("creds.update", saveCreds);

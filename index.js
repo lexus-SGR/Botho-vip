@@ -1,19 +1,25 @@
-require('events').EventEmitter.defaultMaxListeners = 100;
-require("dotenv").config();
-const fs = require("fs");
-const path = require("path");
-const qrcode = require("qrcode-terminal");
-const qrcodeImg = require("qrcode");
-const P = require("pino");
-const express = require("express");
+import { EventEmitter } from "events";
+EventEmitter.defaultMaxListeners = 100;
 
-const {
+import dotenv from "dotenv";
+dotenv.config();
+
+import fs from "fs";
+import path from "path";
+import qrcode from "qrcode-terminal";
+import qrcodeImg from "qrcode";
+import P from "pino";
+import express from "express";
+
+import {
   makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
-  makeCacheableSignalKeyStore
-} = require("@whiskeysockets/baileys");
+  makeCacheableSignalKeyStore,
+} from "@whiskeysockets/baileys";
+
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 // SETTINGS
 const OWNER_NUMBER = "255654478605";
@@ -33,14 +39,16 @@ const PORT = process.env.PORT || 3000;
 let lastQRCode = null;
 
 // JSON Paths
-const antiLinkFile = path.join(__dirname, 'antilink.json');
-const nsfwSettingsFile = path.join(__dirname, 'nsfwsettings.json');
+const antiLinkFile = path.join(__dirname, "antilink.json");
+const nsfwSettingsFile = path.join(__dirname, "nsfwsettings.json");
 
 // Load JSON files
 let antiLinkGroups = fs.existsSync(antiLinkFile)
-  ? JSON.parse(fs.readFileSync(antiLinkFile, 'utf-8')) : {};
+  ? JSON.parse(fs.readFileSync(antiLinkFile, "utf-8"))
+  : {};
 let nsfwSettings = fs.existsSync(nsfwSettingsFile)
-  ? JSON.parse(fs.readFileSync(nsfwSettingsFile, 'utf-8')) : {};
+  ? JSON.parse(fs.readFileSync(nsfwSettingsFile, "utf-8"))
+  : {};
 
 // Welcome toggle
 const welcomeGroups = new Set();
@@ -50,15 +58,18 @@ const commands = new Map();
 const commandsPath = path.join(__dirname, "commands");
 
 if (fs.existsSync(commandsPath)) {
-  fs.readdirSync(commandsPath).forEach((file) => {
+  const files = fs.readdirSync(commandsPath);
+  for (const file of files) {
     if (file.endsWith(".js")) {
-      const command = require(path.join(commandsPath, file));
+      // Dynamically import ES module command
+      const commandModule = await import(path.join(commandsPath, file));
+      const command = commandModule.default || commandModule;
       if (command.name && typeof command.execute === "function") {
         commands.set(command.name.toLowerCase(), command);
         console.log(`✅ Loaded command: ${command.name}`);
       }
     }
-  });
+  }
 }
 
 // Manual commands
@@ -66,14 +77,15 @@ commands.set("nsfwblock", {
   name: "nsfwblock",
   description: "Enable or disable NSFW blocker",
   async execute(sock, msg, args, from, sender, isGroup) {
-    if (!isGroup) return await sock.sendMessage(from, { text: "Group only command." });
+    if (!isGroup)
+      return await sock.sendMessage(from, { text: "Group only command." });
     const arg = args[0]?.toLowerCase();
     if (arg !== "on" && arg !== "off")
       return await sock.sendMessage(from, { text: `Usage: ${PREFIX}nsfwblock on/off` });
     nsfwSettings[from] = arg === "on";
     fs.writeFileSync(nsfwSettingsFile, JSON.stringify(nsfwSettings, null, 2));
     await sock.sendMessage(from, { text: `NSFW blocker is now *${arg.toUpperCase()}*.` });
-  }
+  },
 });
 
 commands.set("menu", {
@@ -83,12 +95,12 @@ commands.set("menu", {
     const text = `
 🤖 *lovenness-cyber Bot Menu* 🤖
 
-${[...commands.keys()].map(cmd => `🔹 ${PREFIX}${cmd}`).join("\n")}
+${[...commands.keys()].map((cmd) => `🔹 ${PREFIX}${cmd}`).join("\n")}
 
 👑 Owner: @${OWNER_NUMBER}
     `;
     await sock.sendMessage(from, { text, mentions: [OWNER_JID] });
-  }
+  },
 });
 
 // View once
@@ -213,7 +225,7 @@ async function startBot() {
 
       if (commandName === "welcome" && isGroup) {
         const meta = await sock.groupMetadata(from);
-        const isAdmin = meta.participants.find(p => p.id === sender)?.admin != null;
+        const isAdmin = meta.participants.find((p) => p.id === sender)?.admin != null;
         if (!isAdmin) return;
         if (welcomeGroups.has(from)) {
           welcomeGroups.delete(from);

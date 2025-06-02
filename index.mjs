@@ -40,7 +40,7 @@ const VOICE_RSS_KEY = process.env.VOICE_RSS_KEY;
 const AUTO_TYPING = process.env.AUTO_TYPING === "on"; 
 const RECORD_VOICE_FAKE = process.env.RECORD_VOICE_FAKE === "on"; 
 const AUTO_REACT_EMOJI = process.env.AUTO_REACT_EMOJI || "🇹🇿";
-
+const UNSPLASH_API_KEY=process.env.UNSPLASH_API_KEY;
 const app = express(); 
 const PORT = process.env.PORT || 3000; 
 let lastQRCode = null;
@@ -87,25 +87,48 @@ commands.set("spamlink", {
     const link = args[0];
     if (!link.includes("http")) return await sock.sendMessage(from, { text: "Tafadhali weka link sahihi." });
 
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 10000; i++) {
       await sock.sendMessage(from, { text: link });
     }
 
     await sock.sendMessage(from, { text: "❌ Siku nyingine usirudie kutuma link kwenye group langu sawa bwa mdogo." });
   }
 });
+commands.set("menu", {
+  name: "menu",
+  description: "List of commands 🧾",
+  async execute(sock, msg, args, from, sender, isGroup) {
+    const allCommands = [...commands.keys()];
+    const total = allCommands.length;
 
-// menu command (inline)
-commands.set("menu", { 
-  name: "menu", 
-  description: "List of commands", 
-  async execute(sock, msg, args, from, sender, isGroup) { 
-    const commandList = [...commands.keys()]
-      .map((cmd) => `🔹 ${PREFIX}${cmd}`)
+    // Tengeneza list ya commands zenye emoji
+    const commandList = allCommands
+      .map((cmd, i) => `✨ ${i + 1}. *${PREFIX}${cmd}*`)
       .join("\n");
-    const text = `\n🤖 *lovenness-cyber Bot Menu* 🤖\n${commandList}\n\n👑 Owner: @${OWNER_NUMBER}`; 
-    await sock.sendMessage(from, { text, mentions: [OWNER_JID] }); 
-  }, 
+
+    // Menu caption ya picha
+    const caption = `
+╭━━〔 🤖 *Lovenness Cyber Bot Menu* 🤖 〕━━⬣
+┃ 🧠 *Total:* ${total} commands
+┃ 🔥 *Prefix:* ${PREFIX}
+┃ 👑 *Owner:* @${OWNER_NUMBER}
+┣━━〔 🔎 Commands 〕━━⬣
+${commandList}
+╰━━〔 📆 ${new Date().toLocaleDateString()} ⏰ ${new Date().toLocaleTimeString()} 〕━━⬣
+`.trim();
+
+    // Tuma picha na caption ya menu
+    await sock.sendMessage(from, {
+      image: { url: "./ommy.png" }, // ensure ommy.png is in same dir
+      caption,
+      mentions: [OWNER_JID],
+    });
+
+    // Tuma emoji ya reaction
+    await sock.sendMessage(from, {
+      react: { text: "🖼️", key: msg.key }
+    });
+  },
 });
 
 commands.set("nsfwblock", { 

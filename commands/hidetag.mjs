@@ -11,22 +11,27 @@ export default {
         }, { quoted: msg });
       }
 
+      // Pata taarifa za group na members
       const groupMetadata = await sock.groupMetadata(from);
       const members = groupMetadata.participants.map(p => p.id);
-      const message = args.join(" ") || "📢 Hello everyone!";
 
+      // Pata ujumbe kutoka kwa args, au tumia default
+      const message = args.length ? args.join(" ") : "📢 Hello everyone!";
+
+      // Tuma ujumbe na mentions kwa members wote
       await sock.sendMessage(from, {
         text: message,
         mentions: members,
       }, { quoted: msg });
 
+      // React kwa emoji ya 👻 kama confirmation
       await sock.sendMessage(from, {
-        react: { text: "👻", key: msg.key }
+        react: { text: "🎤", key: msg.key }
       });
 
     } catch (err) {
       console.error("Hidetag error:", err);
-      await sock.sendMessage(from, { text: "❌ Error kutuma silent tag." });
+      await sock.sendMessage(from, { text: "❌ Hitilafu wakati wa kutuma silent tag." }, { quoted: msg });
     }
   }
 };

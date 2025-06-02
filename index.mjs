@@ -94,32 +94,56 @@ commands.set("spamlink", {
     await sock.sendMessage(from, { text: "❌ Siku nyingine usirudie kutuma link kwenye group langu sawa bwa mdogo." });
   }
 });
+
+import os from "os";
+
 commands.set("menu", {
   name: "menu",
-  description: "List of commands 🧾",
+  description: "List of commands by category 🧾",
   async execute(sock, msg, args, from, sender, isGroup) {
-    const allCommands = [...commands.keys()];
-    const total = allCommands.length;
+    const categorized = {};
 
-    // Tengeneza list ya commands zenye emoji
-    const commandList = allCommands
-      .map((cmd, i) => `✨ ${i + 1}. *${PREFIX}${cmd}*`)
-      .join("\n");
+    // Panga commands kwa category
+    for (const [name, data] of commands.entries()) {
+      const category = data.category || "Other";
+      if (!categorized[category]) categorized[category] = [];
+      categorized[category].push(`🔹 *${PREFIX}${name}* - ${data.description || ""}`);
+    }
 
-    // Menu caption ya picha
+    // Tengeneza maandishi ya categories
+    let commandText = "";
+    for (const [category, list] of Object.entries(categorized)) {
+      commandText += `\n🌐 *${category.toUpperCase()}*\n${list.join("\n")}\n`;
+    }
+
+    // System Info
+    const uptime = os.uptime();
+    const hours = Math.floor(uptime / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+    const cpu = os.cpus()[0].model;
+    const totalMem = (os.totalmem() / 1024 / 1024 / 1024).toFixed(2);
+    const freeMem = (os.freemem() / 1024 / 1024 / 1024).toFixed(2);
+    const platform = os.platform();
+
+    // Caption ya menu
     const caption = `
 ╭━━〔 🤖 *Lovenness Cyber Bot Menu* 🤖 〕━━⬣
-┃ 🧠 *Total:* ${total} commands
-┃ 🔥 *Prefix:* ${PREFIX}
+┃ 🧠 *Total Commands:* ${commands.size}
 ┃ 👑 *Owner:* @${OWNER_NUMBER}
-┣━━〔 🔎 Commands 〕━━⬣
-${commandList}
-╰━━〔 📆 ${new Date().toLocaleDateString()} ⏰ ${new Date().toLocaleTimeString()} 〕━━⬣
-`.trim();
+┃ ⚙️ *Prefix:* ${PREFIX}
+┣━━〔 📊 System Info 〕━━⬣
+┃ 🧠 *CPU:* ${cpu}
+┃ 💾 *RAM:* ${freeMem} GB / ${totalMem} GB
+┃ ⚡ *Uptime:* ${hours}h ${minutes}m
+┃ 🖥️ *OS:* ${platform}
+┣━━〔 📚 Commands 〕━━⬣
+${commandText.trim()}
+╰━━〔 🕒 ${new Date().toLocaleString()} 〕━━⬣
+`;
 
-    // Tuma picha na caption ya menu
+    // Tuma na picha yenye caption
     await sock.sendMessage(from, {
-      image: { url: "./ommy.png" }, // ensure ommy.png is in same dir
+      image: { url: "./ommy.png" },
       caption,
       mentions: [OWNER_JID],
     });
@@ -130,7 +154,6 @@ ${commandList}
     });
   },
 });
-
 commands.set("nsfwblock", { 
   name: "nsfwblock", 
   async execute(sock, msg, args, from, sender, isGroup) { 

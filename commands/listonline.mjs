@@ -1,6 +1,6 @@
 export default {
   name: "listonline",
-  description: "Onesha members walio online kwenye group",
+  description: "Onyesha members wote wa group (hakuna data ya online realtime)",
   category: "group",
   usage: "😁listonline",
   async execute(sock, msg) {
@@ -12,37 +12,33 @@ export default {
       }, { quoted: msg });
     }
 
-    const groupMetadata = await sock.groupMetadata(from);
-    const participants = groupMetadata.participants;
+    try {
+      const groupMetadata = await sock.groupMetadata(from);
+      const participants = groupMetadata.participants;
+      const groupName = groupMetadata.subject || "Group";
 
-    let onlineMembers = [];
+      const membersList = participants
+        .map((p, i) => `${i + 1}. @${p.id.split("@")[0]}`)
+        .join("\n");
 
-    for (let user of participants) {
-      try {
-        const presence = await sock.presenceSubscribe(user.id);
-        if (presence && presence.lastKnownPresence === "available") {
-          onlineMembers.push(user.id);
-        }
-      } catch (e) {
-        // Skip kama kuna error kwa mtu mmoja
-      }
-    }
+      const text = `📛 *Group:* ${groupName}\n👥 *Members (${participants.length}):*\n\n${membersList}`;
 
-    if (onlineMembers.length === 0) {
-      return await sock.sendMessage(from, {
-        text: "🙁 Hakuna aliye online kwa sasa."
+      const mentions = participants.map(p => p.id);
+
+      await sock.sendMessage(from, {
+        text,
+        mentions
+      }, { quoted: msg });
+
+      await sock.sendMessage(from, {
+        react: { text: "✅", key }
+      });
+
+    } catch (err) {
+      console.error("Error in listonline:", err);
+      await sock.sendMessage(from, {
+        text: "❌ Hitilafu ilitokea kuonyesha list ya members."
       }, { quoted: msg });
     }
-
-    const mentionList = onlineMembers.map((id, i) => `${i + 1}. @${id.split("@")[0]}`).join("\n");
-
-    await sock.sendMessage(from, {
-      text: `📶 *Online Members (${onlineMembers.length}):*\n\n${mentionList}`,
-      mentions: onlineMembers
-    }, { quoted: msg });
-
-    await sock.sendMessage(from, {
-      react: { text: "✅", key }
-    });
   }
 };

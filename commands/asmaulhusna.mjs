@@ -1,22 +1,26 @@
 const names = [
-  { name: "Ar-Rahman", meaning: "Mwingi wa Rehema", desc: "Rehema Yake ni ya wote, waumini na wasioamini." },
-  { name: "Ar-Rahim", meaning: "Mwenye kurehemu", desc: "Rehema ya pekee kwa waumini." },
-  { name: "Al-Malik", meaning: "Mfalme", desc: "Mmiliki wa kila kitu kilicho duniani na mbinguni." },
-  { name: "Al-Quddus", meaning: "Mtakatifu", desc: "Aliyetakasika na upungufu wote." },
-  { name: "As-Salam", meaning: "Mtoaji wa Amani", desc: "Anatoa amani kwa viumbe Wake." },
-  { name: "Al-Mu’min", meaning: "Mwenye kutoa amani na usalama", desc: "Humthibitishia mja usalama wa kweli." },
-  { name: "Al-Aziz", meaning: "Mwenye nguvu na enzi", desc: "Hakuna mwenye kumshinda." },
-  { name: "Al-Hakim", meaning: "Mwenye hikma", desc: "Anatoa maamuzi kwa hekima kamili." },
-  { name: "Al-Ghaffar", meaning: "Mwingi wa kusamehe", desc: "Husamehe makosa bila ukomo kwa wenye kutubu." },
-  { name: "Al-Khaliq", meaning: "Muumbaji", desc: "Yeye ndiye aliyeumba kila kilicho hai na kisicho hai." },
-  // Unaweza kuongeza majina mengine 89 kwa urahisi hapa
+  { name: "Ar-Rahman", meaning: "Mwingi wa Rehema", desc: "Rehema Yake ni kwa wote." },
+  { name: "Ar-Rahim", meaning: "Mwenye kurehemu", desc: "Huwaonea huruma waumini." },
+  { name: "Al-Malik", meaning: "Mfalme", desc: "Mmiliki wa kila kitu." },
+  { name: "Al-Quddus", meaning: "Mtakatifu", desc: "Aliye mbali na kila upungufu." },
+  { name: "As-Salam", meaning: "Mtoaji wa amani", desc: "Mwenye kutuliza roho." },
+  { name: "Al-Mu’min", meaning: "Mwenye kutoa usalama", desc: "Huhakikishia waumini usalama." },
+  { name: "Al-Aziz", meaning: "Mwenye enzi", desc: "Hakuna anayemshinda." },
+  { name: "Al-Hakim", meaning: "Mwenye hekima", desc: "Maamuzi yake ni yenye hekima." },
+  { name: "Al-Ghaffar", meaning: "Mwingi wa kusamehe", desc: "Husamehe makosa ya wenye kutubu." },
+  { name: "Al-Khaliq", meaning: "Muumbaji", desc: "Aliumba kila kilicho hai." },
+  { name: "Al-Bari", meaning: "Muumba pasipo mfano", desc: "Huumba kwa ukamilifu." },
+  { name: "Al-Musawwir", meaning: "Mfinyanzi", desc: "Hupa kila kiumbe sura na umbo." },
+  { name: "Al-‘Aleem", meaning: "Mjuzi", desc: "Anajua yote yaliyo wazi na yaliyofichwa." },
+  { name: "Al-Khabir", meaning: "Mwenye habari", desc: "Anafahamu undani wa mambo." },
+  { name: "As-Sami’", meaning: "Msikivu", desc: "Husikia kila kilicho semwa." },
 ];
 
 export default {
   name: "asmaulhusna",
-  description: "Toa moja kati ya Majina 99 ya Allah (Asmaul Husna) 🕌",
+  description: "Onesha moja ya Majina 99 ya Allah (Asmaul Husna) 🕌",
   category: "islamic",
-  usage: "!asmaulhusna",
+  usage: "📿 !asmaulhusna",
   async execute(sock, msg) {
     const item = names[Math.floor(Math.random() * names.length)];
     const response = `🕌 *${item.name}* — _${item.meaning}_\n\n📖 ${item.desc}`;
